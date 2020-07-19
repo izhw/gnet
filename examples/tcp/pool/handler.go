@@ -17,10 +17,10 @@ func NewAsyncHandler() *AsyncHandler {
 }
 
 func (h *AsyncHandler) OnReadMsg(c gnet.Conn, data []byte) error {
-	h.logger.Info(c.GetTag(), "AsyncClient read msg:", string(data))
+	h.logger.Info(c.GetTag(), "AsyncPool read msg:", string(data))
 	return nil
 }
 
 func (h *AsyncHandler) OnWriteError(c gnet.Conn, data []byte, err error) {
-	h.logger.Warn(c.GetTag(), "AsyncClient write error:", err)
+	h.logger.Warn(c.GetTag(), "AsyncPool write error:", err)
 }

@@ -9,8 +9,8 @@ go get -u github.com/izhw/gnet
 ## Features
 Building net service quickly with functional options
 * [x] TCP Server and Client
+* [x] Connection pool
 * [ ] WebSocket Server and Client
-* [ ] Connection pool
 
 ## Quick start
 
@@ -18,6 +18,7 @@ Building net service quickly with functional options
 
 * [tcp-server](https://github.com/izhw/gnet/tree/master/examples/tcp/server)
 * [tcp-client](https://github.com/izhw/gnet/tree/master/examples/tcp/client)
+* [conn-pool](https://github.com/izhw/gnet/tree/master/examples/tcp/pool)
 
 #### TCP Server
 
@@ -118,7 +119,100 @@ func main() {
     fmt.Println("AsyncClient done")
 }
 ```
-#### Functional options for znet
+
+#### Connection pool
+* Sync mode
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/izhw/gnet"
+    "github.com/izhw/gnet/pool"
+)
+
+func main() {
+    p, err := pool.NewPool("127.0.0.1:7777",
+        gnet.WithPoolSize(5, 10),
+        //gnet.WithPoolGetTimeout(10*time.Second),
+        //gnet.WithPoolIdleTimeout(30*time.Minute),
+        //gnet.WithHeartbeat([]byte{0}, 30*time.Second),
+    )
+    if err != nil {
+        fmt.Println("New pool error:", err)
+        os.Exit(1)
+    }
+    defer p.Close()
+    
+    c, err := p.Get()
+    if err != nil {
+        fmt.Println("Pool Get error:", err)
+        os.Exit(1)
+    }
+    defer p.Put(c)
+    
+    resp, err := c.WriteRead([]byte("Hello world"))
+    if err != nil {
+        fmt.Println("Pool WriteRead error:", err)
+        os.Exit(1)
+    }
+    fmt.Println("Pool WriteRead:", string(resp))
+}
+```
+* Async mode
+```go
+package main
+
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/pool"
+)
+
+type AsyncHandler struct {
+	*gnet.NetEventHandler
+}
+
+func (h *AsyncHandler) OnReadMsg(c gnet.Conn, data []byte) error {
+	fmt.Println("Pool read msg:", string(data))
+	return nil
+}
+
+func main() {
+	p, err := pool.NewAsyncPool("127.0.0.1:7777",
+		&AsyncHandler{},
+		gnet.WithPoolSize(0, 10),
+		//gnet.WithPoolGetTimeout(10*time.Second),
+		//gnet.WithPoolIdleTimeout(30*time.Minute),
+		//gnet.WithHeartbeat([]byte{0}, 30*time.Second),
+	)
+	if err != nil {
+		fmt.Println("New pool error:", err)
+		os.Exit(1)
+	}
+	defer p.Close()
+
+	c, err := p.Get()
+	if err != nil {
+		fmt.Println("Pool Get error:", err)
+		os.Exit(1)
+	}
+	defer p.Put(c)
+
+	if err := c.Write([]byte("Hello world")); err != nil {
+		fmt.Println("Pool Write error:", err)
+		os.Exit(1)
+	}
+	time.Sleep(3 * time.Second)
+}
+```
+
+#### Functional options for gnet
 for example:
 ```go
     s := tcpserver.NewServer("0.0.0.0:7777",
@@ -129,5 +223,5 @@ for example:
         ...,
     )
 ```
-See `znet/options.go` for more options
+See `gnet/options.go` for more options
 

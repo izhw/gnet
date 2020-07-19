@@ -21,6 +21,7 @@
 package tcpclient
 
 import (
+	"context"
 	"io"
 	"net"
 	"sync"
@@ -31,7 +32,7 @@ import (
 	"github.com/izhw/gnet/tcp/internal"
 )
 
-type AsyncClient struct {
+type asyncClient struct {
 	opts      gnet.Options
 	conn      net.Conn
 	handler   gnet.EventHandler
@@ -44,7 +45,7 @@ type AsyncClient struct {
 	tag       string
 }
 
-func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (*AsyncClient, error) {
+func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (gnet.Conn, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (*Asy
 	if h == nil {
 		h = gnet.DefaultEventHandler()
 	}
-	c := &AsyncClient{
+	c := &asyncClient{
 		opts:      gnet.DefaultOptions(),
 		conn:      conn,
 		handler:   h,
@@ -61,6 +62,9 @@ func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (*Asy
 	}
 	for _, o := range opts {
 		o(&c.opts)
+	}
+	if c.opts.Ctx == nil {
+		c.opts.Ctx = context.Background()
 	}
 	c.buffer = internal.NewReaderBuffer(c.conn, int(c.opts.InitReadBufLen), int(c.opts.MaxReadBufLen))
 	c.wwg.Add(1)
@@ -74,48 +78,20 @@ func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (*Asy
 	return c, nil
 }
 
-func (c *AsyncClient) Close() {
-	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
-		return
-	}
-	close(c.closeChan)
-	c.wwg.Wait()
-	for len(c.sendChan) > 0 {
-		data := <-c.sendChan
-		if err := c.write(data); err != nil {
-			c.handler.OnWriteError(c, data, err)
-		}
-	}
-	_ = c.conn.Close()
-	c.rwg.Wait()
-	c.buffer.Release()
-	c.handler.OnClosed(c)
-	if c.opts.StatusCallback != nil {
-		c.opts.StatusCallback.OnClosed(c)
-	}
+func (c *asyncClient) Read(buf []byte) (n int, err error) {
+	return 0, gnet.ErrConnInvalidCall
 }
 
-func (c *AsyncClient) Closed() bool {
-	if atomic.LoadInt32(&c.closed) == 1 {
-		return true
-	}
-	return false
+func (c *asyncClient) ReadFull(buf []byte) (n int, err error) {
+	return 0, gnet.ErrConnInvalidCall
 }
 
-func (c *AsyncClient) SetTag(tag string) {
-	c.tag = tag
-}
-
-func (c *AsyncClient) GetTag() string {
-	return c.tag
-}
-
-func (c *AsyncClient) RemoteAddr() string {
-	return c.conn.RemoteAddr().String()
+func (c *asyncClient) WriteRead(req []byte) (body []byte, err error) {
+	return nil, gnet.ErrConnInvalidCall
 }
 
 // Write data should be without header if Encoder != nil
-func (c *AsyncClient) Write(data []byte) error {
+func (c *asyncClient) Write(data []byte) error {
 	if len(data) > 0 {
 		select {
 		case <-c.closeChan:
@@ -127,7 +103,45 @@ func (c *AsyncClient) Write(data []byte) error {
 	return nil
 }
 
-func (c *AsyncClient) handleReadLoop() {
+func (c *asyncClient) Close() (err error) {
+	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
+		return
+	}
+	close(c.closeChan)
+	c.wwg.Wait()
+	for len(c.sendChan) > 0 {
+		data := <-c.sendChan
+		if err := c.write(data); err != nil {
+			c.handler.OnWriteError(c, data, err)
+		}
+	}
+	err = c.conn.Close()
+	c.rwg.Wait()
+	c.buffer.Release()
+	c.handler.OnClosed(c)
+	return
+}
+
+func (c *asyncClient) Closed() bool {
+	if atomic.LoadInt32(&c.closed) == 1 {
+		return true
+	}
+	return false
+}
+
+func (c *asyncClient) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *asyncClient) SetTag(tag string) {
+	c.tag = tag
+}
+
+func (c *asyncClient) GetTag() string {
+	return c.tag
+}
+
+func (c *asyncClient) handleReadLoop() {
 	defer func() {
 		c.rwg.Done()
 		c.Close()
@@ -176,7 +190,7 @@ func (c *AsyncClient) handleReadLoop() {
 	}
 }
 
-func (c *AsyncClient) handleWriteLoop() {
+func (c *asyncClient) handleWriteLoop() {
 	defer func() {
 		c.wwg.Done()
 		c.Close()
@@ -184,6 +198,8 @@ func (c *AsyncClient) handleWriteLoop() {
 
 	for {
 		select {
+		case <-c.opts.Ctx.Done():
+			return
 		case <-c.closeChan:
 			return
 		case data, ok := <-c.sendChan:
@@ -199,7 +215,7 @@ func (c *AsyncClient) handleWriteLoop() {
 	}
 }
 
-func (c *AsyncClient) handleWriteLoopWithHeartbeat() {
+func (c *asyncClient) handleWriteLoopWithHeartbeat() {
 	timer := time.NewTimer(c.opts.HeartInterval)
 	defer func() {
 		timer.Stop()
@@ -208,23 +224,11 @@ func (c *AsyncClient) handleWriteLoopWithHeartbeat() {
 	}()
 
 	for {
-		if !timer.Stop() {
-			select {
-			case <-timer.C:
-			default:
-			}
-		}
-		timer.Reset(c.opts.HeartInterval)
 		select {
+		case <-c.opts.Ctx.Done():
+			return
 		case <-c.closeChan:
 			return
-		case <-timer.C:
-			if err := c.write(c.opts.HeartData); err != nil {
-				if err != io.EOF {
-					c.opts.Logger.Infof("TCP client write heartbeat error:[%v]", err)
-				}
-				return
-			}
 		case data, ok := <-c.sendChan:
 			if !ok {
 				return
@@ -234,18 +238,50 @@ func (c *AsyncClient) handleWriteLoopWithHeartbeat() {
 				c.handler.OnWriteError(c, data, err)
 				return
 			}
+			continue
+		default:
+		}
+		// heartbeat
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(c.opts.HeartInterval)
+		select {
+		case <-c.opts.Ctx.Done():
+			return
+		case <-c.closeChan:
+			return
+		case data, ok := <-c.sendChan:
+			if !ok {
+				return
+			}
+			err := c.write(data)
+			if err != nil {
+				c.handler.OnWriteError(c, data, err)
+				return
+			}
+		case <-timer.C:
+			if err := c.write(c.opts.HeartData); err != nil {
+				if err != io.EOF {
+					c.opts.Logger.Infof("TCP client write heartbeat error:[%v]", err)
+				}
+				return
+			}
 		}
 	}
 }
 
-func (c *AsyncClient) getWriteDeadLine() (t time.Time) {
+func (c *asyncClient) getWriteDeadLine() (t time.Time) {
 	if c.opts.WriteTimeout > 0 {
 		t = time.Now().Add(c.opts.WriteTimeout)
 	}
 	return
 }
 
-func (c *AsyncClient) write(data []byte) (err error) {
+func (c *asyncClient) write(data []byte) (err error) {
 	if c.opts.Encoder != nil {
 		data = c.opts.Encoder(data)
 	}

@@ -21,6 +21,7 @@
 package gnet
 
 import (
+	"context"
 	"time"
 
 	"github.com/izhw/gnet/logger"
@@ -39,10 +40,27 @@ type Options struct {
 	MaxReadBufLen  uint32                        // default: network.MaxRWLen
 	ConnLimit      uint32                        // default: 0, unlimited, limit of conn num for Server
 
-	HeartData     []byte        // AsyncClient, heartbeat data, should be without header if Encoder not nil
-	HeartInterval time.Duration // AsyncClient, heartbeat interval, default: 30s
+	// HeartData heartbeat data, for asyncClient or Pool
+	// should be without header if Encoder not nil
+	HeartData []byte
+	// HeartInterval heartbeat interval, default: 30s
+	HeartInterval time.Duration
 
-	StatusCallback ConnStatusCallback
+	Ctx context.Context
+
+	// Tag tag for gnet.Conn
+	Tag string
+
+	// PoolInitSize number of connections to establish when creating a pool
+	PoolInitSize uint32
+	// PoolMaxSize max number of connections in pool
+	PoolMaxSize uint32
+	// PoolGetTimeout timeout for getting a Conn from pool
+	PoolGetTimeout time.Duration
+	// PoolIdleTimeout Conn max idle duration,
+	// if timeout occurs, Conn will be closed and removed from the pool
+	// default:0, means conn will not time out.
+	PoolIdleTimeout time.Duration
 }
 
 func DefaultOptions() Options {
@@ -57,7 +75,9 @@ func DefaultOptions() Options {
 		ConnLimit:      0,
 		HeartData:      nil,
 		HeartInterval:  30 * time.Second,
-		StatusCallback: nil,
+		PoolInitSize:   0,
+		PoolMaxSize:    10,
+		PoolGetTimeout: 10 * time.Second,
 	}
 }
 
@@ -122,7 +142,7 @@ func WithConnNumLimit(limit uint32) Option {
 	}
 }
 
-// WithHeartbeat for AsyncClient
+// WithHeartbeat for AsyncClient or Pool
 // data: body data
 func WithHeartbeat(data []byte, interval time.Duration) Option {
 	return func(o *Options) {
@@ -133,9 +153,46 @@ func WithHeartbeat(data []byte, interval time.Duration) Option {
 	}
 }
 
-// WithConnStatusCallback
-func WithConnStatusCallback(cb ConnStatusCallback) Option {
+// WithContext
+func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
-		o.StatusCallback = cb
+		o.Ctx = ctx
+	}
+}
+
+// WithTag
+func WithTag(tag string) Option {
+	return func(o *Options) {
+		o.Tag = tag
+	}
+}
+
+// WithPoolSize
+func WithPoolSize(init, max uint32) Option {
+	return func(o *Options) {
+		if max > 0 {
+			o.PoolMaxSize = max
+		}
+		if init > o.PoolMaxSize {
+			init = o.PoolMaxSize
+		}
+		if init > 0 {
+			o.PoolInitSize = init
+		}
+	}
+}
+
+// WithPoolGetTimeout Get a Conn from pool, failed when timeout occurs
+// default: 10s
+func WithPoolGetTimeout(timeout time.Duration) Option {
+	return func(o *Options) {
+		o.PoolGetTimeout = timeout
+	}
+}
+
+// WithPoolIdleTimeout
+func WithPoolIdleTimeout(timeout time.Duration) Option {
+	return func(o *Options) {
+		o.PoolIdleTimeout = timeout
 	}
 }

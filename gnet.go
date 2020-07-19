@@ -20,6 +20,10 @@
 
 package gnet
 
+import "net"
+
+type Factory func() (Conn, error)
+
 // Server
 // e.g. TCP server, WebSocket server
 type Server interface {
@@ -32,17 +36,48 @@ type Server interface {
 	ConnNum() uint32
 }
 
-type Conn interface {
+// connection pool
+type Pool interface {
+	// Get gets a Conn from the pool, creates an Conn if necessary,
+	// removes it from the Pool, and returns it to the caller.
+	Get() (conn Conn, err error)
+
+	// Put adds conn to the pool.
+	// The conn returned by Get should be passed to Put once and only once,
+	// whether it's closed or not
+	Put(conn Conn)
+
+	// Close closes the pool and all connections in the pool
 	Close()
-	Closed() bool
-	Write(data []byte) error
-	RemoteAddr() string
-	SetTag(tag string)
-	GetTag() string
 }
 
-type ConnStatusCallback interface {
-	OnClosed(c Conn)
+type Conn interface {
+	// Read reads data from the connection, only for sync Client.
+	// Decoder(in Options) is not used.
+	Read(buf []byte) (n int, err error)
+	// ReadFull reads exactly len(buf) bytes from Conn into buf, only for sync Client.
+	// It returns the number of bytes copied and an error if fewer bytes were read.
+	// On return, n == len(buf) if and only if err == nil.
+	// Decoder(in Options) is not used.
+	ReadFull(buf []byte) (n int, err error)
+	// WriteRead writes the request and reads the response, only for sync Client.
+	// Encoder and Decoder(in Options) are used
+	// returning msg body, without header
+	WriteRead(req []byte) (body []byte, err error)
+
+	// Write writes data to the connection.
+	// the data should be without header if Encoder(in Options) != nil
+	Write(data []byte) error
+	// Close closes the connection.
+	Close() error
+	// Closed
+	Closed() bool
+	// RemoteAddr returns the remote network address.
+	RemoteAddr() net.Addr
+	// SetTag sets a tag to Conn
+	SetTag(tag string)
+	// GetTag gets the tag
+	GetTag() string
 }
 
 // EventHandler Conn events callback

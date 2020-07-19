@@ -18,19 +18,19 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package util
+package limter
 
-type Limiter struct {
+type defaultLimiter struct {
 	c chan struct{}
 }
 
-func NewLimiter(n uint32) *Limiter {
-	return &Limiter{
+func NewLimiter(n uint32) Limiter {
+	return &defaultLimiter{
 		c: make(chan struct{}, n),
 	}
 }
 
-func (l *Limiter) Allow() bool {
+func (l *defaultLimiter) Allow() bool {
 	select {
 	case l.c <- struct{}{}:
 		return true
@@ -39,6 +39,6 @@ func (l *Limiter) Allow() bool {
 	}
 }
 
-func (l *Limiter) Revert() {
+func (l *defaultLimiter) Revert() {
 	<-l.c
 }

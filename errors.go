@@ -23,6 +23,10 @@ package gnet
 import "errors"
 
 var (
-	ErrConnClosed  = errors.New("conn:closed")
-	ErrMsgTooLarge = errors.New("msg too large")
+	ErrTooLarge        = errors.New("data:too large")
+	ErrConnClosed      = errors.New("conn:closed")
+	ErrConnInvalidCall = errors.New("conn:invalid call")
+	ErrPoolClosed      = errors.New("pool:closed")
+	ErrPoolTimeout     = errors.New("pool:timeout")
+	ErrPoolInvalidAddr = errors.New("pool:invalid addr")
 )

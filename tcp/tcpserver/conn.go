@@ -61,35 +61,16 @@ func newConn(ctx context.Context, s *server, conn *net.TCPConn) *Conn {
 	return c
 }
 
-func (c *Conn) Close() {
-	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
-		return
-	}
-	close(c.closeChan)
-	c.wwg.Wait()
-	for len(c.sendChan) > 0 {
-		data := <-c.sendChan
-		if err := c.write(data); err != nil {
-			c.s.handler.OnWriteError(c, data, err)
-		}
-	}
-	c.conn.Close()
-	c.rwg.Wait()
-	c.buffer.Release()
-	c.s.handler.OnClosed(c)
-	c.s.onConnClose()
-	c.s = nil
+func (c *Conn) Read(buf []byte) (n int, err error) {
+	return 0, gnet.ErrConnInvalidCall
 }
 
-func (c *Conn) Closed() bool {
-	if atomic.LoadInt32(&c.closed) == 1 {
-		return true
-	}
-	return false
+func (c *Conn) ReadFull(buf []byte) (n int, err error) {
+	return 0, gnet.ErrConnInvalidCall
 }
 
-func (c *Conn) RemoteAddr() string {
-	return c.conn.RemoteAddr().String()
+func (c *Conn) WriteRead(req []byte) (body []byte, err error) {
+	return nil, gnet.ErrConnInvalidCall
 }
 
 func (c *Conn) Write(data []byte) error {
@@ -101,6 +82,38 @@ func (c *Conn) Write(data []byte) error {
 		}
 	}
 	return nil
+}
+
+func (c *Conn) Close() (err error) {
+	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
+		return
+	}
+	close(c.closeChan)
+	c.wwg.Wait()
+	for len(c.sendChan) > 0 {
+		data := <-c.sendChan
+		if err := c.write(data); err != nil {
+			c.s.handler.OnWriteError(c, data, err)
+		}
+	}
+	err = c.conn.Close()
+	c.rwg.Wait()
+	c.buffer.Release()
+	c.s.handler.OnClosed(c)
+	c.s.onConnClose()
+	c.s = nil
+	return
+}
+
+func (c *Conn) Closed() bool {
+	if atomic.LoadInt32(&c.closed) == 1 {
+		return true
+	}
+	return false
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
 }
 
 func (c *Conn) SetTag(tag string) {

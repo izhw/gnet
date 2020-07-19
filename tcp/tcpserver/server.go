@@ -32,7 +32,7 @@ import (
 	"time"
 
 	"github.com/izhw/gnet"
-	"github.com/izhw/gnet/internal/util"
+	"github.com/izhw/gnet/internal/util/limter"
 	"github.com/izhw/gnet/logger"
 )
 
@@ -41,11 +41,11 @@ const DefaultAddr = "0.0.0.0:7777"
 var _ gnet.Server = &server{}
 
 type server struct {
-	opts     gnet.Options
 	addr     string
+	opts     gnet.Options
 	handler  gnet.EventHandler
 	listener net.Listener
-	limiter  *util.Limiter
+	limiter  limter.Limiter
 	stopChan chan struct{}
 	wg       sync.WaitGroup
 	connNum  uint32
@@ -57,8 +57,8 @@ func NewServer(addr string, h gnet.EventHandler, opts ...gnet.Option) gnet.Serve
 		addr = DefaultAddr
 	}
 	s := &server{
-		opts:    gnet.DefaultOptions(),
 		addr:    addr,
+		opts:    gnet.DefaultOptions(),
 		handler: h,
 		stopped: 1,
 	}
@@ -81,9 +81,11 @@ func (s *server) Serve() error {
 		s.opts.Logger = logger.DefaultLogger()
 	}
 	if s.opts.ConnLimit > 0 {
-		s.limiter = util.NewLimiter(s.opts.ConnLimit)
+		s.limiter = limter.NewLimiter(s.opts.ConnLimit)
 	}
-
+	if s.opts.Ctx == nil {
+		s.opts.Ctx = context.Background()
+	}
 	s.wg.Add(1)
 	go s.work()
 	s.stopChan = make(chan struct{})
@@ -94,6 +96,9 @@ func (s *server) Serve() error {
 
 	// Wait on signal
 	select {
+	case <-s.opts.Ctx.Done():
+		s.Stop()
+		return s.opts.Ctx.Err()
 	case <-s.stopChan:
 		s.wait()
 	case sig := <-c:
@@ -130,10 +135,11 @@ func (s *server) onConnClose() {
 }
 
 func (s *server) work() {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(s.opts.Ctx)
 	defer func() {
 		cancel()
 		s.wg.Done()
+		s.Stop()
 	}()
 
 	for {
@@ -149,7 +155,7 @@ func (s *server) work() {
 				return
 			default:
 			}
-			s.opts.Logger.Warnf("TCP server accept error:[%v]", err)
+			s.opts.Logger.Errorf("TCP server accept error:[%v]", err)
 			return
 		}
 		if s.limiter != nil && !s.limiter.Allow() {

@@ -24,7 +24,7 @@ func (h *ServerHandler) OnClosed(c gnet.Conn) {
 }
 
 func (h *ServerHandler) OnReadMsg(c gnet.Conn, data []byte) error {
-	h.logger.Info(c.RemoteAddr(), "read msg:", string(data))
+	h.logger.Info(c.RemoteAddr(), "Server read msg:", string(data))
 	if err := c.Write(data); err != nil {
 		h.logger.Error("write error:", err)
 		return err

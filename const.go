@@ -21,5 +21,6 @@
 package gnet
 
 const (
-	MaxRWLen uint32 = 1 << 25 // 32M
+	MaxRWLen        uint32 = 1 << 25 // 32M
+	DefaultPoolSize uint32 = 10
 )

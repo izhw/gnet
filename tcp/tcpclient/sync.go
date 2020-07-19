@@ -31,7 +31,7 @@ import (
 	"github.com/izhw/gnet/tcp/internal"
 )
 
-type Client struct {
+type client struct {
 	opts   gnet.Options
 	conn   net.Conn
 	buffer *internal.ReaderBuffer
@@ -39,12 +39,12 @@ type Client struct {
 	tag    string
 }
 
-func NewClient(addr string, opts ...gnet.Option) (*Client, error) {
+func NewClient(addr string, opts ...gnet.Option) (gnet.Conn, error) {
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
-	c := &Client{
+	c := &client{
 		opts: gnet.DefaultOptions(),
 		conn: conn,
 	}
@@ -55,77 +55,22 @@ func NewClient(addr string, opts ...gnet.Option) (*Client, error) {
 	return c, nil
 }
 
-func (c *Client) Close() {
-	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
-		return
-	}
-	_ = c.conn.Close()
-	if c.opts.StatusCallback != nil {
-		c.opts.StatusCallback.OnClosed(c)
-	}
-}
-
-func (c *Client) Closed() bool {
-	if atomic.LoadInt32(&c.closed) == 1 {
-		return true
-	}
-	return false
-}
-
-func (c *Client) SetTag(tag string) {
-	c.tag = tag
-}
-
-func (c *Client) GetTag() string {
-	return c.tag
-}
-
-func (c *Client) RemoteAddr() string {
-	return c.conn.RemoteAddr().String()
-}
-
-func (c *Client) getReadDeadLine() (t time.Time) {
-	if c.opts.ReadTimeout > 0 {
-		t = time.Now().Add(c.opts.ReadTimeout)
-	}
-	return
-}
-
-func (c *Client) getWriteDeadLine() (t time.Time) {
-	if c.opts.WriteTimeout > 0 {
-		t = time.Now().Add(c.opts.WriteTimeout)
-	}
-	return
-}
-
-// Read not using Decoder
-func (c *Client) Read(buf []byte) (n int, err error) {
+// Read
+func (c *client) Read(buf []byte) (n int, err error) {
 	_ = c.conn.SetReadDeadline(c.getReadDeadLine())
 	return c.conn.Read(buf)
 }
 
-// ReadFull not using Decoder
+// ReadFull
 // On return, n == len(buf) if and only if err == nil.
-func (c *Client) ReadFull(buf []byte) (n int, err error) {
+func (c *client) ReadFull(buf []byte) (n int, err error) {
 	_ = c.conn.SetReadDeadline(c.getReadDeadLine())
 	return io.ReadFull(c.conn, buf)
 }
 
-// Write data should be without header if Encoder != nil
-func (c *Client) Write(data []byte) error {
-	if c.opts.Encoder != nil {
-		data = c.opts.Encoder(data)
-	}
-	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
-	if _, err := c.conn.Write(data); err != nil {
-		return err
-	}
-	return nil
-}
-
 // WriteRead using Encoder(if Encoder != nil) and Decoder
 // returning msg body, without header
-func (c *Client) WriteRead(req []byte) (body []byte, err error) {
+func (c *client) WriteRead(req []byte) (body []byte, err error) {
 	if c.opts.Encoder != nil {
 		req = c.opts.Encoder(req)
 	}
@@ -145,7 +90,7 @@ func (c *Client) WriteRead(req []byte) (body []byte, err error) {
 		}
 		msgLen := bodyLen + headerLen
 		if msgLen > c.opts.MaxReadBufLen {
-			return nil, gnet.ErrMsgTooLarge
+			return nil, gnet.ErrTooLarge
 		}
 		if uint32(c.buffer.Len()) < msgLen {
 			continue
@@ -154,4 +99,56 @@ func (c *Client) WriteRead(req []byte) (body []byte, err error) {
 		c.buffer.Read(int(headerLen), int(bodyLen), buf)
 		return buf, nil
 	}
+}
+
+// Write data should be without header if Encoder != nil
+func (c *client) Write(data []byte) error {
+	if c.opts.Encoder != nil {
+		data = c.opts.Encoder(data)
+	}
+	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
+	if _, err := c.conn.Write(data); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *client) Close() error {
+	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
+		return nil
+	}
+	return c.conn.Close()
+}
+
+func (c *client) Closed() bool {
+	if atomic.LoadInt32(&c.closed) == 1 {
+		return true
+	}
+	return false
+}
+
+func (c *client) RemoteAddr() net.Addr {
+	return c.conn.RemoteAddr()
+}
+
+func (c *client) SetTag(tag string) {
+	c.tag = tag
+}
+
+func (c *client) GetTag() string {
+	return c.tag
+}
+
+func (c *client) getReadDeadLine() (t time.Time) {
+	if c.opts.ReadTimeout > 0 {
+		t = time.Now().Add(c.opts.ReadTimeout)
+	}
+	return
+}
+
+func (c *client) getWriteDeadLine() (t time.Time) {
+	if c.opts.WriteTimeout > 0 {
+		t = time.Now().Add(c.opts.WriteTimeout)
+	}
+	return
 }

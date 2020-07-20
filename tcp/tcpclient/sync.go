@@ -71,11 +71,8 @@ func (c *client) ReadFull(buf []byte) (n int, err error) {
 // WriteRead using HeaderCodec
 // returning msg body, without header
 func (c *client) WriteRead(data []byte) (body []byte, err error) {
-	header := c.opts.HeaderCodec.Encode(data)
+	data = c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
-	if _, err := c.conn.Write(header); err != nil {
-		return nil, fmt.Errorf("write:%w", err)
-	}
 	if _, err := c.conn.Write(data); err != nil {
 		return nil, fmt.Errorf("write:%w", err)
 	}
@@ -104,11 +101,8 @@ func (c *client) WriteRead(data []byte) (body []byte, err error) {
 
 // Write using HeaderCodec
 func (c *client) Write(data []byte) error {
-	header := c.opts.HeaderCodec.Encode(data)
+	data = c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
-	if _, err := c.conn.Write(header); err != nil {
-		return err
-	}
 	if _, err := c.conn.Write(data); err != nil {
 		return err
 	}

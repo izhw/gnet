@@ -30,7 +30,7 @@ type HeaderCodec interface {
 	// b: [header...]
 	// v: the value of header, is the length of body
 	Decode(b []byte) (v uint32, n uint32)
-	// Encode returns the bytes header
+	// Encode returns header + body
 	// data: body data
 	Encode(data []byte) []byte
 }
@@ -48,10 +48,11 @@ func (c *CodecFixed32) Decode(b []byte) (v uint32, n uint32) {
 	return v, 4
 }
 
-// Encode returns header(4 bytes, big-endian uint32)
+// Encode returns header(4 bytes, big-endian uint32)+body
 func (c *CodecFixed32) Encode(data []byte) []byte {
-	b := make([]byte, 4)
+	b := make([]byte, 4, 4+len(data))
 	binary.BigEndian.PutUint32(b, uint32(len(data)))
+	b = append(b, data...)
 	return b
 }
 
@@ -66,8 +67,9 @@ func (c *CodecFixed32) Encode(data []byte) []byte {
 //	return uint32(v64), uint32(n)
 //}
 //
-//// Encode returns header(protobuf varint)
+//// Encode returns header(protobuf varint)+body
 //func (c *CodecProtoVarint) Encode(data []byte) []byte {
 //	b := proto.EncodeVarint(uint64(len(data)))
+//	b = append(b, data...)
 //	return b
 //}

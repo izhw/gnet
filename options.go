@@ -39,18 +39,17 @@ type Options struct {
 	MaxReadBufLen  uint32               // default: network.MaxRWLen
 	ConnLimit      uint32               // default: 0, unlimited, limit of conn num for Server
 
-	// HeartData heartbeat data, for asyncClient or Pool
-	// should be without header if Encoder not nil
-	HeartData []byte
-	// HeartInterval heartbeat interval, default: 30s
-	HeartInterval time.Duration
-
 	// Context specifies a context for the service.
 	// Can be used to signal shutdown of the service.
 	Ctx context.Context
 
 	// Tag tag for gnet.Conn
 	Tag string
+
+	// HeartData heartbeat data, for asyncClient or gnet.Pool
+	HeartData []byte
+	// HeartInterval heartbeat interval, default: 30s
+	HeartInterval time.Duration
 
 	// PoolInitSize number of connections to establish when creating a pool
 	PoolInitSize uint32

@@ -282,11 +282,8 @@ func (c *asyncClient) getWriteDeadLine() (t time.Time) {
 }
 
 func (c *asyncClient) write(data []byte) (err error) {
-	header := c.opts.HeaderCodec.Encode(data)
+	data = c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
-	if _, err = c.conn.Write(header); err != nil {
-		return
-	}
 	_, err = c.conn.Write(data)
 	return
 }

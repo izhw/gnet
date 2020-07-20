@@ -171,7 +171,7 @@ func (c *Conn) handleReadLoop(ctx context.Context) {
 			return
 		}
 		for c.buffer.Len() > 0 {
-			bodyLen, headerLen := c.s.opts.Decoder(c.buffer.Data())
+			bodyLen, headerLen := c.s.opts.HeaderCodec.Decode(c.buffer.Data())
 			if headerLen == 0 {
 				break
 			}
@@ -218,10 +218,11 @@ func (c *Conn) handleWriteLoop(ctx context.Context) {
 }
 
 func (c *Conn) write(data []byte) (err error) {
-	if c.s.opts.Encoder != nil {
-		data = c.s.opts.Encoder(data)
-	}
+	header := c.s.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
+	if _, err = c.conn.Write(header); err != nil {
+		return
+	}
 	_, err = c.conn.Write(data)
 	return
 }

@@ -168,7 +168,7 @@ func (c *asyncClient) handleReadLoop() {
 			return
 		}
 		for c.buffer.Len() > 0 {
-			bodyLen, headerLen := c.opts.Decoder(c.buffer.Data())
+			bodyLen, headerLen := c.opts.HeaderCodec.Decode(c.buffer.Data())
 			if headerLen == 0 {
 				break
 			}
@@ -282,10 +282,11 @@ func (c *asyncClient) getWriteDeadLine() (t time.Time) {
 }
 
 func (c *asyncClient) write(data []byte) (err error) {
-	if c.opts.Encoder != nil {
-		data = c.opts.Encoder(data)
-	}
+	header := c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
+	if _, err = c.conn.Write(header); err != nil {
+		return
+	}
 	_, err = c.conn.Write(data)
 	return
 }

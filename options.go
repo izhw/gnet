@@ -31,14 +31,13 @@ import (
 type Option func(o *Options)
 
 type Options struct {
-	Logger         logger.Logger                 // default: &discardLogger{}
-	Encoder        protocol.HeaderEncodeProtocol // default: protocol.EncodeFixed32, nil value means Encoder disabled
-	Decoder        protocol.HeaderDecodeProtocol // default: protocol.DecodeFixed32
-	ReadTimeout    time.Duration                 // default: 2m, zero value means I/O operations will not time out
-	WriteTimeout   time.Duration                 // default: 5s, zero value means I/O operations will not time out
-	InitReadBufLen uint32                        // default: 1024, init length of conn reading buf
-	MaxReadBufLen  uint32                        // default: network.MaxRWLen
-	ConnLimit      uint32                        // default: 0, unlimited, limit of conn num for Server
+	Logger         logger.Logger        // default: &discardLogger{}
+	HeaderCodec    protocol.HeaderCodec // default: &protocol.CodecFixed32{}
+	ReadTimeout    time.Duration        // default: 2m, zero value means I/O operations will not time out
+	WriteTimeout   time.Duration        // default: 5s, zero value means I/O operations will not time out
+	InitReadBufLen uint32               // default: 1024, init length of conn reading buf
+	MaxReadBufLen  uint32               // default: network.MaxRWLen
+	ConnLimit      uint32               // default: 0, unlimited, limit of conn num for Server
 
 	// HeartData heartbeat data, for asyncClient or Pool
 	// should be without header if Encoder not nil
@@ -46,6 +45,8 @@ type Options struct {
 	// HeartInterval heartbeat interval, default: 30s
 	HeartInterval time.Duration
 
+	// Context specifies a context for the service.
+	// Can be used to signal shutdown of the service.
 	Ctx context.Context
 
 	// Tag tag for gnet.Conn
@@ -66,8 +67,7 @@ type Options struct {
 func DefaultOptions() Options {
 	return Options{
 		Logger:         logger.DefaultLogger(),
-		Encoder:        protocol.EncodeFixed32,
-		Decoder:        protocol.DecodeFixed32,
+		HeaderCodec:    &protocol.CodecFixed32{},
 		ReadTimeout:    2 * time.Minute,
 		WriteTimeout:   5 * time.Second,
 		InitReadBufLen: 1024,
@@ -95,11 +95,12 @@ func WithLogger(l logger.Logger) Option {
 	}
 }
 
-// default: protocol.EncodeFixed32 & protocol.DecodeFixed32
-func WithParseHeaderProtocol(e protocol.HeaderEncodeProtocol, d protocol.HeaderDecodeProtocol) Option {
+// default: &protocol.CodecFixed32{}
+func WithHeaderCodec(codec protocol.HeaderCodec) Option {
 	return func(o *Options) {
-		o.Encoder = e
-		o.Decoder = d
+		if codec != nil {
+			o.HeaderCodec = codec
+		}
 	}
 }
 

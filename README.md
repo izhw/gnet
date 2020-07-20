@@ -10,6 +10,7 @@ go get -u github.com/izhw/gnet
 Building net service quickly with functional options
 * [x] TCP Server and Client
 * [x] Connection pool
+* [ ] gRPC Srever and Client
 * [ ] WebSocket Server and Client
 
 ## Quick start
@@ -219,7 +220,7 @@ for example:
         NewServerHandler(),
         gnet.WithLogger(logger.NewSimpleLogger()),
         gnet.WithConnNumLimit(50),
-        gnet.WithParseHeaderProtocol(protocol.EncodeProtoVarint, protocol.DecodeProtoVarint),
+        gnet.WithHeaderCodec(&protocol.CodecProtoVarint{}),
         ...,
     )
 ```

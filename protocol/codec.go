@@ -24,20 +24,50 @@ import (
 	"encoding/binary"
 )
 
-// HeaderEncodeProtocol returns header+data
-// data: body data
-type HeaderEncodeProtocol func(data []byte) []byte
+type HeaderCodec interface {
+	// Decode returns the integer value and its length
+	// It returns (0, 0) if there is a parse error
+	// b: [header...]
+	// v: the value of header, is the length of body
+	Decode(b []byte) (v uint32, n uint32)
+	// Encode returns the bytes header
+	// data: body data
+	Encode(data []byte) []byte
+}
 
-// EncodeFixed32 returns header(4 bytes, big-endian uint32)+data
-func EncodeFixed32(data []byte) []byte {
-	b := make([]byte, 4, 4+len(data))
+type CodecFixed32 struct {
+}
+
+// Decode parses b as a big-endian uint32,
+// returns the integer value and its length
+func (c *CodecFixed32) Decode(b []byte) (v uint32, n uint32) {
+	if len(b) < 4 {
+		return 0, 0
+	}
+	v = binary.BigEndian.Uint32(b)
+	return v, 4
+}
+
+// Encode returns header(4 bytes, big-endian uint32)
+func (c *CodecFixed32) Encode(data []byte) []byte {
+	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b, uint32(len(data)))
-	b = append(b, data...)
 	return b
 }
 
-// EncodeProtoVarint returns header(protobuf varint)+data
-//func EncodeProtoVarint(data []byte) []byte {
+// codec for protobuf varint
+//type CodecProtoVarint struct {
+//}
+//
+//// Decode parses a protobuf varint encoded integer from b,
+//// returning the integer value and the length of the varint
+//func (c *CodecProtoVarint) Decode(b []byte) (uint32, uint32) {
+//	v64, n := proto.DecodeVarint(b)
+//	return uint32(v64), uint32(n)
+//}
+//
+//// Encode returns header(protobuf varint)
+//func (c *CodecProtoVarint) Encode(data []byte) []byte {
 //	b := proto.EncodeVarint(uint64(len(data)))
-//	return append(b, data...)
+//	return b
 //}

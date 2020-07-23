@@ -142,17 +142,6 @@ func WithConnNumLimit(limit uint32) Option {
 	}
 }
 
-// WithHeartbeat for AsyncClient or Pool
-// data: body data
-func WithHeartbeat(data []byte, interval time.Duration) Option {
-	return func(o *Options) {
-		o.HeartData = data
-		if interval > 0 {
-			o.HeartInterval = interval
-		}
-	}
-}
-
 // WithContext
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
@@ -164,6 +153,17 @@ func WithContext(ctx context.Context) Option {
 func WithTag(tag string) Option {
 	return func(o *Options) {
 		o.Tag = tag
+	}
+}
+
+// WithHeartbeat for AsyncClient or Pool
+// data: body data
+func WithHeartbeat(data []byte, interval time.Duration) Option {
+	return func(o *Options) {
+		o.HeartData = data
+		if interval > 0 {
+			o.HeartInterval = interval
+		}
 	}
 }
 

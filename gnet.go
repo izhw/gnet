@@ -53,20 +53,17 @@ type Pool interface {
 
 type Conn interface {
 	// Read reads data from the connection, only for sync Client.
-	// Decoder(in Options) is not used.
 	Read(buf []byte) (n int, err error)
 	// ReadFull reads exactly len(buf) bytes from Conn into buf, only for sync Client.
 	// It returns the number of bytes copied and an error if fewer bytes were read.
 	// On return, n == len(buf) if and only if err == nil.
-	// Decoder(in Options) is not used.
 	ReadFull(buf []byte) (n int, err error)
 	// WriteRead writes the request and reads the response, only for sync Client.
-	// Encoder and Decoder(in Options) are used
+	// HeaderCodec(in Options) is used
 	// returning msg body, without header
 	WriteRead(req []byte) (body []byte, err error)
 
 	// Write writes data to the connection.
-	// the data should be without header if Encoder(in Options) != nil
 	Write(data []byte) error
 	// Close closes the connection.
 	Close() error

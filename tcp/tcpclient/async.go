@@ -21,7 +21,6 @@
 package tcpclient
 
 import (
-	"context"
 	"io"
 	"net"
 	"sync"
@@ -62,9 +61,6 @@ func NewAsyncClient(addr string, h gnet.EventHandler, opts ...gnet.Option) (gnet
 	}
 	for _, o := range opts {
 		o(&c.opts)
-	}
-	if c.opts.Ctx == nil {
-		c.opts.Ctx = context.Background()
 	}
 	c.buffer = internal.NewReaderBuffer(c.conn, int(c.opts.InitReadBufLen), int(c.opts.MaxReadBufLen))
 	c.wwg.Add(1)

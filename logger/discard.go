@@ -20,7 +20,9 @@
 
 package logger
 
-import "os"
+import (
+	"os"
+)
 
 var _ Logger = &discardLogger{}
 

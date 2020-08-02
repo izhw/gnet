@@ -20,7 +20,9 @@
 
 package gnet
 
-import "net"
+import (
+	"net"
+)
 
 type Factory func() (Conn, error)
 

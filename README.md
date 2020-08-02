@@ -224,5 +224,5 @@ for example:
         ...,
     )
 ```
-See `gnet/options.go` for more options
+See `options.go` for more options
 

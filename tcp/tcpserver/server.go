@@ -83,9 +83,6 @@ func (s *server) Serve() error {
 	if s.opts.ConnLimit > 0 {
 		s.limiter = limter.NewLimiter(s.opts.ConnLimit)
 	}
-	if s.opts.Ctx == nil {
-		s.opts.Ctx = context.Background()
-	}
 	s.wg.Add(1)
 	go s.work()
 	s.stopChan = make(chan struct{})

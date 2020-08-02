@@ -43,7 +43,7 @@ type Options struct {
 	// Can be used to signal shutdown of the service.
 	Ctx context.Context
 
-	// Tag tag for gnet.Conn
+	// Tag a tag for gnet.Conn
 	Tag string
 
 	// HeartData heartbeat data, for asyncClient or gnet.Pool
@@ -72,6 +72,7 @@ func DefaultOptions() Options {
 		InitReadBufLen: 1024,
 		MaxReadBufLen:  MaxRWLen,
 		ConnLimit:      0,
+		Ctx:            context.Background(),
 		HeartData:      nil,
 		HeartInterval:  30 * time.Second,
 		PoolInitSize:   0,

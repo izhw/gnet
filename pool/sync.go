@@ -65,15 +65,13 @@ func NewPool(addr string, opts ...gnet.Option) (gnet.Pool, error) {
 	}
 	p.connChan = make(chan *poolConn, p.opts.PoolMaxSize)
 	p.limiter = limter.NewTimeoutLimiter(p.opts.PoolMaxSize, p.opts.PoolGetTimeout)
-	if p.opts.Ctx != nil {
-		go func() {
-			select {
-			case <-p.opts.Ctx.Done():
-			case <-p.closeChan:
-			}
-			p.Close()
-		}()
-	}
+	go func() {
+		select {
+		case <-p.opts.Ctx.Done():
+		case <-p.closeChan:
+		}
+		p.Close()
+	}()
 	for i := 0; i < int(p.opts.PoolInitSize); i++ {
 		conn, err := p.createConn()
 		if err != nil {

@@ -20,7 +20,9 @@
 
 package gnet
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrTooLarge        = errors.New("data:too large")

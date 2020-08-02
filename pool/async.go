@@ -63,9 +63,6 @@ func NewAsyncPool(addr string, h gnet.EventHandler, opts ...gnet.Option) (gnet.P
 	}
 	p.connChan = make(chan gnet.Conn, p.opts.PoolMaxSize)
 	p.limiter = limter.NewTimeoutLimiter(p.opts.PoolMaxSize, p.opts.PoolGetTimeout)
-	if p.opts.Ctx == nil {
-		p.opts.Ctx = context.Background()
-	}
 	ctx, cancel := context.WithCancel(p.opts.Ctx)
 	go func() {
 		<-ctx.Done()

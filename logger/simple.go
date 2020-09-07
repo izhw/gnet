@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync/atomic"
 )
 
 var _ Logger = &simpleLogger{}
@@ -31,54 +32,110 @@ var _ Logger = &simpleLogger{}
 func NewSimpleLogger() Logger {
 	return &simpleLogger{
 		depth:  2,
-		logger: log.New(os.Stderr, "[network] ", log.LstdFlags|log.Lshortfile),
+		level:  int32(InfoLevel),
+		logger: log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile),
+	}
+}
+
+func NewSimpleLoggerWithLevel(l Level) Logger {
+	return &simpleLogger{
+		depth:  2,
+		level:  int32(l),
+		logger: log.New(os.Stderr, "", log.LstdFlags|log.Lshortfile),
 	}
 }
 
 // simpleLogger implementation for Logger
 type simpleLogger struct {
 	depth  int
+	level  int32
 	logger *log.Logger
 }
 
 func (l *simpleLogger) Debug(v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintln(v...))
+	if l.getLevel() > DebugLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(DebugLevel, fmt.Sprintln(v...)))
 }
 
 func (l *simpleLogger) Debugf(format string, v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintf(format, v...))
+	if l.getLevel() > DebugLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(DebugLevel, fmt.Sprintf(format, v...)))
 }
 
 func (l *simpleLogger) Info(v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintln(v...))
+	if l.getLevel() > InfoLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(InfoLevel, fmt.Sprintln(v...)))
 }
 
 func (l *simpleLogger) Infof(format string, v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintf(format, v...))
+	if l.getLevel() > InfoLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(InfoLevel, fmt.Sprintf(format, v...)))
 }
 
 func (l *simpleLogger) Warn(v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintln(v...))
+	if l.getLevel() > WarnLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(WarnLevel, fmt.Sprintln(v...)))
 }
 
 func (l *simpleLogger) Warnf(format string, v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintf(format, v...))
+	if l.getLevel() > WarnLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(WarnLevel, fmt.Sprintf(format, v...)))
 }
 
 func (l *simpleLogger) Error(v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintln(v...))
+	if l.getLevel() > ErrorLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(ErrorLevel, fmt.Sprintln(v...)))
 }
 
 func (l *simpleLogger) Errorf(format string, v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintf(format, v...))
+	if l.getLevel() > ErrorLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(ErrorLevel, fmt.Sprintf(format, v...)))
 }
 
 func (l *simpleLogger) Fatal(v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintln(v...))
+	if l.getLevel() > FatalLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(FatalLevel, fmt.Sprintln(v...)))
 	os.Exit(1)
 }
 
 func (l *simpleLogger) Fatalf(format string, v ...interface{}) {
-	l.logger.Output(l.depth, fmt.Sprintf(format, v...))
+	if l.getLevel() > FatalLevel {
+		return
+	}
+	l.logger.Output(l.depth, decorate(FatalLevel, fmt.Sprintf(format, v...)))
 	os.Exit(1)
+}
+
+func (l *simpleLogger) GetLevel() Level {
+	return l.getLevel()
+}
+
+func (l *simpleLogger) SetLevel(level Level) {
+	atomic.StoreInt32(&l.level, int32(level))
+}
+
+func (l *simpleLogger) getLevel() Level {
+	return Level(atomic.LoadInt32(&l.level))
+}
+
+func decorate(logLevel Level, msg string) string {
+	return fmt.Sprintf("[%s] %s", logLevel, msg)
 }

@@ -18,25 +18,39 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
-import (
-	"github.com/izhw/gnet/gcore"
-)
-
-type Server gcore.Server
-type Conn gcore.Conn
-type Pool gcore.Pool
-
-// Service is an interface that wraps the server, client and pool,
-// for building and initialising services conveniently.
-type Service interface {
-	Server() Server
-	Client() Conn
-	Pool() Pool
+// EventHandler Conn events callback
+type EventHandler interface {
+	// OnOpened a new Conn has been opened
+	OnOpened(c Conn)
+	// OnClosed c has been closed
+	OnClosed(c Conn)
+	// OnReadMsg read one msg
+	// data: body data
+	// if err != nil, conn will be closed
+	OnReadMsg(c Conn, data []byte) (err error)
+	// OnWriteError an error occurred while writing data to c
+	OnWriteError(c Conn, data []byte, err error)
 }
 
-// NewService creates and returns a new Service with options.
-func NewService(opts ...gcore.Option) Service {
-	return newService(opts...)
+func DefaultEventHandler() EventHandler {
+	return &NetEventHandler{}
+}
+
+// NetEventHandler is a built-in implementation for EventHandler
+type NetEventHandler struct {
+}
+
+func (h *NetEventHandler) OnOpened(c Conn) {
+}
+
+func (h *NetEventHandler) OnClosed(c Conn) {
+}
+
+func (h *NetEventHandler) OnReadMsg(c Conn, data []byte) (err error) {
+	return nil
+}
+
+func (h *NetEventHandler) OnWriteError(c Conn, data []byte, err error) {
 }

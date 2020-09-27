@@ -18,25 +18,18 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
-import (
-	"github.com/izhw/gnet/gcore"
-)
-
-type Server gcore.Server
-type Conn gcore.Conn
-type Pool gcore.Pool
-
-// Service is an interface that wraps the server, client and pool,
-// for building and initialising services conveniently.
-type Service interface {
-	Server() Server
-	Client() Conn
-	Pool() Pool
-}
-
-// NewService creates and returns a new Service with options.
-func NewService(opts ...gcore.Option) Service {
-	return newService(opts...)
+// Server
+// e.g. TCP server, WebSocket server
+type Server interface {
+	// Init initiates server with options
+	Init(opts ...Option) error
+	// Serve starts handling events for Server.
+	Serve() error
+	// Stop can stop the service whenever you want to
+	// it is also called automatically when an interrupt signal arrives
+	Stop()
+	// ConnNum returns the number of currently active connections
+	ConnNum() uint32
 }

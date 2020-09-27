@@ -27,50 +27,57 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/tcp/internal"
 )
 
-type client struct {
-	opts   gnet.Options
+var _ gcore.Conn = &Client{}
+
+type Client struct {
+	opts   gcore.Options
 	conn   net.Conn
 	buffer *internal.ReaderBuffer
 	closed int32
 	tag    string
 }
 
-func NewClient(addr string, opts ...gnet.Option) (gnet.Conn, error) {
-	conn, err := net.Dial("tcp", addr)
+func NewClient() *Client {
+	return &Client{}
+}
+
+func (c *Client) WithOptions(opts gcore.Options) {
+	c.opts = opts
+}
+
+func (c *Client) Init(opts ...gcore.Option) error {
+	for _, opt := range opts {
+		opt(&c.opts)
+	}
+	conn, err := net.Dial("tcp", c.opts.Addr)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	c := &client{
-		opts: gnet.DefaultOptions(),
-		conn: conn,
-	}
-	for _, o := range opts {
-		o(&c.opts)
-	}
+	c.conn = conn
 	c.buffer = internal.NewReaderBuffer(c.conn, int(c.opts.InitReadBufLen), int(c.opts.MaxReadBufLen))
-	return c, nil
+	return nil
 }
 
 // Read
-func (c *client) Read(buf []byte) (n int, err error) {
+func (c *Client) Read(buf []byte) (n int, err error) {
 	_ = c.conn.SetReadDeadline(c.getReadDeadLine())
 	return c.conn.Read(buf)
 }
 
 // ReadFull
 // On return, n == len(buf) if and only if err == nil.
-func (c *client) ReadFull(buf []byte) (n int, err error) {
+func (c *Client) ReadFull(buf []byte) (n int, err error) {
 	_ = c.conn.SetReadDeadline(c.getReadDeadLine())
 	return io.ReadFull(c.conn, buf)
 }
 
 // WriteRead using HeaderCodec
 // returning msg body, without header
-func (c *client) WriteRead(data []byte) (body []byte, err error) {
+func (c *Client) WriteRead(data []byte) (body []byte, err error) {
 	data = c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
 	if _, err := c.conn.Write(data); err != nil {
@@ -88,7 +95,7 @@ func (c *client) WriteRead(data []byte) (body []byte, err error) {
 		}
 		msgLen := bodyLen + headerLen
 		if msgLen > c.opts.MaxReadBufLen {
-			return nil, gnet.ErrTooLarge
+			return nil, gcore.ErrTooLarge
 		}
 		if uint32(c.buffer.Len()) < msgLen {
 			continue
@@ -100,7 +107,7 @@ func (c *client) WriteRead(data []byte) (body []byte, err error) {
 }
 
 // Write using HeaderCodec
-func (c *client) Write(data []byte) error {
+func (c *Client) Write(data []byte) error {
 	data = c.opts.HeaderCodec.Encode(data)
 	_ = c.conn.SetWriteDeadline(c.getWriteDeadLine())
 	if _, err := c.conn.Write(data); err != nil {
@@ -109,40 +116,40 @@ func (c *client) Write(data []byte) error {
 	return nil
 }
 
-func (c *client) Close() error {
+func (c *Client) Close() error {
 	if !atomic.CompareAndSwapInt32(&c.closed, 0, 1) {
 		return nil
 	}
 	return c.conn.Close()
 }
 
-func (c *client) Closed() bool {
+func (c *Client) Closed() bool {
 	if atomic.LoadInt32(&c.closed) == 1 {
 		return true
 	}
 	return false
 }
 
-func (c *client) RemoteAddr() net.Addr {
+func (c *Client) RemoteAddr() net.Addr {
 	return c.conn.RemoteAddr()
 }
 
-func (c *client) SetTag(tag string) {
+func (c *Client) SetTag(tag string) {
 	c.tag = tag
 }
 
-func (c *client) GetTag() string {
+func (c *Client) GetTag() string {
 	return c.tag
 }
 
-func (c *client) getReadDeadLine() (t time.Time) {
+func (c *Client) getReadDeadLine() (t time.Time) {
 	if c.opts.ReadTimeout > 0 {
 		t = time.Now().Add(c.opts.ReadTimeout)
 	}
 	return
 }
 
-func (c *client) getWriteDeadLine() (t time.Time) {
+func (c *Client) getWriteDeadLine() (t time.Time) {
 	if c.opts.WriteTimeout > 0 {
 		t = time.Now().Add(c.opts.WriteTimeout)
 	}

@@ -18,25 +18,35 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
 import (
-	"github.com/izhw/gnet/gcore"
+	"net"
 )
 
-type Server gcore.Server
-type Conn gcore.Conn
-type Pool gcore.Pool
-
-// Service is an interface that wraps the server, client and pool,
-// for building and initialising services conveniently.
-type Service interface {
-	Server() Server
-	Client() Conn
-	Pool() Pool
-}
-
-// NewService creates and returns a new Service with options.
-func NewService(opts ...gcore.Option) Service {
-	return newService(opts...)
+type Conn interface {
+	// Init initiates Conn with options
+	Init(opts ...Option) error
+	// Read reads data from the connection, only for sync Client.
+	Read(buf []byte) (n int, err error)
+	// ReadFull reads exactly len(buf) bytes from Conn into buf, only for sync Client.
+	// It returns the number of bytes copied and an error if fewer bytes were read.
+	// On return, n == len(buf) if and only if err == nil.
+	ReadFull(buf []byte) (n int, err error)
+	// WriteRead writes the request and reads the response, only for sync Client.
+	// HeaderCodec(in Options) is used
+	// returning msg body, without header
+	WriteRead(req []byte) (body []byte, err error)
+	// Write writes data to the connection.
+	Write(data []byte) error
+	// Close closes the connection.
+	Close() error
+	// Closed
+	Closed() bool
+	// RemoteAddr returns the remote network address.
+	RemoteAddr() net.Addr
+	// SetTag sets a tag to Conn
+	SetTag(tag string)
+	// GetTag gets the tag
+	GetTag() string
 }

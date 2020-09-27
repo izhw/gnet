@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/izhw/gnet"
-	"github.com/izhw/gnet/pool"
+	"github.com/izhw/gnet/gcore"
+	"github.com/izhw/gnet/logger"
 )
 
 func main() {
@@ -35,19 +36,23 @@ func main() {
 }
 
 func SyncPool(ctx context.Context) {
-	p, err := pool.NewPool("127.0.0.1:7777",
-		gnet.WithPoolSize(2, 5),
-		//gnet.WithPoolGetTimeout(10*time.Second),
-		//gnet.WithPoolIdleTimeout(30*time.Minute),
-		//gnet.WithHeartbeat([]byte{0}, 30*time.Second),
+	log := logger.GlobalSimpleLogger()
+	service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPPool),
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithPoolSize(2, 5),
+		//gcore.WithPoolGetTimeout(10*time.Second),
+		//gcore.WithPoolIdleTimeout(30*time.Minute),
+		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
-	if err != nil {
-		fmt.Println("New pool error:", err)
+	p := service.Pool()
+	if err := p.Init(); err != nil {
+		log.Error("pool init error:", err)
 		return
 	}
 	defer p.Close()
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	data := []byte("Hello sync")
@@ -57,21 +62,21 @@ func SyncPool(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			for j := 0; j < 10; j++ {
+			for j := 0; j < 5; j++ {
 				go func() {
 					c, err := p.Get()
 					if err != nil {
-						fmt.Println("Pool Get error:", err)
+						log.Error("Pool Get error:", err)
 						return
 					}
 					defer p.Put(c)
 					resp, err := c.WriteRead(data)
 					if err != nil {
 						c.Close()
-						fmt.Println("Pool WriteRead error:", err)
+						log.Error("Pool WriteRead error:", err)
 						return
 					}
-					fmt.Println("Pool WriteRead:", string(resp))
+					log.Info("Pool WriteRead:", string(resp))
 				}()
 			}
 		}
@@ -79,20 +84,24 @@ func SyncPool(ctx context.Context) {
 }
 
 func AsyncPool(ctx context.Context) {
-	p, err := pool.NewAsyncPool("127.0.0.1:7777",
-		NewAsyncHandler(),
-		gnet.WithPoolSize(0, 5),
-		//gnet.WithPoolGetTimeout(10*time.Second),
-		//gnet.WithPoolIdleTimeout(30*time.Minute),
-		//gnet.WithHeartbeat([]byte{0}, 30*time.Second),
+	log := logger.GlobalSimpleLogger()
+	service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithEventHandler(NewAsyncHandler()),
+		gcore.WithPoolSize(0, 5),
+		gcore.WithPoolGetTimeout(5*time.Second),
+		gcore.WithPoolIdleTimeout(30*time.Minute),
+		gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
-	if err != nil {
-		fmt.Println("New pool error:", err)
+	p := service.Pool()
+	if err := p.Init(); err != nil {
+		log.Error("pool init error:", err)
 		return
 	}
 	defer p.Close()
 
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(3 * time.Second)
 	defer ticker.Stop()
 
 	data := []byte("Hello async")
@@ -102,16 +111,16 @@ func AsyncPool(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			for j := 0; j < 10; j++ {
+			for j := 0; j < 5; j++ {
 				go func() {
 					c, err := p.Get()
 					if err != nil {
-						fmt.Println("AsyncPool Get error:", err)
+						log.Error("AsyncPool Get error:", err)
 						return
 					}
 					defer p.Put(c)
 					if err = c.Write(data); err != nil {
-						fmt.Println("AsyncPool Write error:", err)
+						log.Error("AsyncPool Write error:", err)
 						return
 					}
 				}()

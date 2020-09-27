@@ -27,7 +27,11 @@ import (
 	"sync/atomic"
 )
 
-var _ Logger = &simpleLogger{}
+var gSimpleLogger = NewSimpleLogger()
+
+func GlobalSimpleLogger() Logger {
+	return gSimpleLogger
+}
 
 func NewSimpleLogger() Logger {
 	return &simpleLogger{

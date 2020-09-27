@@ -9,8 +9,8 @@ go get -u github.com/izhw/gnet
 ## Features
 Building net service quickly with functional options
 * [x] TCP Server and Client
-* [x] Connection pool
-* [ ] gRPC Srever and Client
+* [x] Connection pools
+* [ ] gRPC Server and Client
 * [ ] WebSocket Server and Client
 
 ## Quick start
@@ -20,6 +20,7 @@ Building net service quickly with functional options
 * [tcp-server](https://github.com/izhw/gnet/tree/master/examples/tcp/server)
 * [tcp-client](https://github.com/izhw/gnet/tree/master/examples/tcp/client)
 * [conn-pool](https://github.com/izhw/gnet/tree/master/examples/tcp/pool)
+* [multi](https://github.com/izhw/gnet/tree/master/examples/tcp/multi)
 
 #### TCP Server
 
@@ -28,29 +29,40 @@ package main
 
 import (
     "fmt"
-    "log"
     
     "github.com/izhw/gnet"
-    "github.com/izhw/gnet/tcp/tcpserver"
+    "github.com/izhw/gnet/gcore"
+    "github.com/izhw/gnet/logger"
 )
 
 type ServerHandler struct {
-    *gnet.NetEventHandler
+    *gcore.NetEventHandler
 }
 
-func (h *ServerHandler) OnReadMsg(c gnet.Conn, data []byte) error {
-    fmt.Println("read msg:", string(data))
+func (h *ServerHandler) OnReadMsg(c gcore.Conn, data []byte) error {
+    fmt.Println("server read msg:", string(data))
     c.Write(data)
     return nil
 }
 
 func main() {
-    s := tcpserver.NewServer("0.0.0.0:7777", &ServerHandler{})
-    log.Fatal("Exit:", s.Serve())
+    log := logger.GlobalSimpleLogger()
+    service := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPServer),
+        gcore.WithAddr("0.0.0.0:7777"),
+        gcore.WithEventHandler(&ServerHandler{}),
+        gcore.WithLogger(log),
+    )
+    s := service.Server()
+    if err := s.Init(); err != nil {
+        log.Fatal("server init error:", err)
+    }
+    log.Fatal("server exit:", s.Serve())
 }
 ```
 
 #### TCP Client
+
 * Sync mode
 ```go
 package main
@@ -59,13 +71,18 @@ import (
     "fmt"
     "os"
     
-    "github.com/izhw/gnet/tcp/tcpclient"
+    "github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 )
 
 func main() {
-    c, err := tcpclient.NewClient("127.0.0.1:7777")
-    if err != nil {
-        fmt.Println(err)
+    service := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPClient),
+        gcore.WithAddr("127.0.0.1:7777"),
+    )
+    c := service.Client()
+    if err := c.Init(); err != nil {
+        fmt.Println("client init error:", err)
         os.Exit(1)
     }
     defer c.Close()
@@ -73,12 +90,13 @@ func main() {
     data := []byte("Hello world")
     resp, err := c.WriteRead(data)
     if err != nil {
-        fmt.Println(err)
+        fmt.Println("client WriteRead error:", err)
         os.Exit(1)
     }
     fmt.Println("recv resp:", string(resp))
 }
 ```
+
 * Async mode
 ```go
 package main
@@ -89,39 +107,45 @@ import (
     "time"
     
     "github.com/izhw/gnet"
-    "github.com/izhw/gnet/tcp/tcpclient"
+    "github.com/izhw/gnet/gcore"
+    "github.com/izhw/gnet/logger"
 )
 
 type AsyncHandler struct {
-    *gnet.NetEventHandler
+    *gcore.NetEventHandler
 }
 
-func (h *AsyncHandler) OnReadMsg(c gnet.Conn, data []byte) error {
-    fmt.Println("read msg:", string(data))
+func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
+    fmt.Println("async client read msg:", string(data))
     return nil
 }
 
 func main() {
-    c, err := tcpclient.NewAsyncClient("127.0.0.1:7777", &AsyncHandler{})
-    if err != nil {
-        fmt.Println(err)
-        os.Exit(1)
-    }
-    defer c.Close()
+    log := logger.GlobalSimpleLogger()
+	service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithEventHandler(&AsyncHandler{}),
+		gcore.WithLogger(log),
+	)
+	c := service.Client()
+	if err := c.Init(); err != nil {
+		log.Fatal("client init error:", err)
+	}
+	defer c.Close()
     
     data := []byte("Hello world")
     for i := 0; i < 10; i++ {
         if err := c.Write(data); err != nil {
-            fmt.Println("write err:", err)
-            os.Exit(1)
+            log.Fatal("client write err:", err)
         }
         time.Sleep(1 * time.Second)
     }
-    fmt.Println("AsyncClient done")
 }
 ```
 
 #### Connection pool
+
 * Sync mode
 ```go
 package main
@@ -131,21 +155,24 @@ import (
     "os"
     
     "github.com/izhw/gnet"
-    "github.com/izhw/gnet/pool"
+    "github.com/izhw/gnet/gcore"
 )
 
 func main() {
-    p, err := pool.NewPool("127.0.0.1:7777",
-        gnet.WithPoolSize(5, 10),
-        //gnet.WithPoolGetTimeout(10*time.Second),
-        //gnet.WithPoolIdleTimeout(30*time.Minute),
-        //gnet.WithHeartbeat([]byte{0}, 30*time.Second),
-    )
-    if err != nil {
-        fmt.Println("New pool error:", err)
-        os.Exit(1)
-    }
-    defer p.Close()
+    service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPPool),
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithPoolSize(5, 10),
+		//gcore.WithPoolGetTimeout(5*time.Second),
+		//gcore.WithPoolIdleTimeout(30*time.Minute),
+		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
+	)
+	p := service.Pool()
+	if err := p.Init(); err != nil {
+		fmt.Println("pool init error:", err)
+		os.Exit(1)
+	}
+	defer p.Close()
     
     c, err := p.Get()
     if err != nil {
@@ -162,7 +189,9 @@ func main() {
     fmt.Println("Pool WriteRead:", string(resp))
 }
 ```
+
 * Async mode
+
 ```go
 package main
 
@@ -172,57 +201,156 @@ import (
 	"time"
 
 	"github.com/izhw/gnet"
-	"github.com/izhw/gnet/pool"
+	"github.com/izhw/gnet/gcore"
+	"github.com/izhw/gnet/logger"
 )
 
 type AsyncHandler struct {
-	*gnet.NetEventHandler
+	*gcore.NetEventHandler
 }
 
-func (h *AsyncHandler) OnReadMsg(c gnet.Conn, data []byte) error {
+func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 	fmt.Println("Pool read msg:", string(data))
 	return nil
 }
 
 func main() {
-	p, err := pool.NewAsyncPool("127.0.0.1:7777",
-		&AsyncHandler{},
-		gnet.WithPoolSize(0, 10),
-		//gnet.WithPoolGetTimeout(10*time.Second),
-		//gnet.WithPoolIdleTimeout(30*time.Minute),
-		//gnet.WithHeartbeat([]byte{0}, 30*time.Second),
+    log := logger.GlobalSimpleLogger()
+	service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithEventHandler(&AsyncHandler{}),
+		gcore.WithPoolSize(0, 10),
+		gcore.WithPoolGetTimeout(5*time.Second),
+		gcore.WithPoolIdleTimeout(30*time.Minute),
+		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
-	if err != nil {
-		fmt.Println("New pool error:", err)
-		os.Exit(1)
+	p := service.Pool()
+	if err := p.Init(); err != nil {
+		log.Fatal("pool init error:", err)
 	}
 	defer p.Close()
 
 	c, err := p.Get()
 	if err != nil {
-		fmt.Println("Pool Get error:", err)
-		os.Exit(1)
+		log.Fatal("Pool Get error:", err)
 	}
 	defer p.Put(c)
 
-	if err := c.Write([]byte("Hello world")); err != nil {
-		fmt.Println("Pool Write error:", err)
-		os.Exit(1)
+	if err = c.Write([]byte("Hello world")); err != nil {
+		log.Fatal("Pool Write error:", err)
 	}
 	time.Sleep(3 * time.Second)
+}
+```
+
+#### multi
+
+You can build `server`, `client` and `pool` in one `service` by setting the `ServiceType`:
+`gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPClient)`
+
+```go
+package main
+
+import (
+	"context"
+    "fmt"
+	"time"
+
+	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
+	"github.com/izhw/gnet/logger"
+)
+
+type ServerHandler struct {
+    *gcore.NetEventHandler
+}
+
+func (h *ServerHandler) OnReadMsg(c gcore.Conn, data []byte) error {
+    fmt.Println("server read msg:", string(data))
+    c.Write(data)
+    return nil
+}
+
+type AsyncHandler struct {
+    *gcore.NetEventHandler
+}
+
+func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
+    fmt.Println("multi client read msg:", string(data))
+    return nil
+}
+
+func main() {
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	log := logger.GlobalSimpleLogger()
+	service := gnet.NewService(
+		gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
+		gcore.WithLogger(log),
+	)
+
+	// client
+	c := service.Client()
+	err := c.Init(
+		gcore.WithAddr("127.0.0.1:7777"),
+		gcore.WithEventHandler(&AsyncHandler{}),
+	)
+	if err != nil {
+		log.Fatal("client init error:", err)
+	}
+	defer c.Close()
+
+	go StartClient(ctx, c)
+
+	// server
+	s := service.Server()
+	err = s.Init(
+		gcore.WithAddr("0.0.0.0:8888"),
+		gcore.WithEventHandler(&ServerHandler{}),
+	)
+	if err != nil {
+		log.Fatal("server init error:", err)
+	}
+	log.Fatal("Exit:", s.Serve())
+}
+
+func StartClient(ctx context.Context, c gnet.Conn) {
+	log := logger.GlobalSimpleLogger()
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	data := []byte("multi client")
+	for i := 0; i < 1000; i++ {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := c.Write(data); err != nil {
+				log.Error("multi client write err:", err)
+				return
+			}
+		}
+	}
 }
 ```
 
 #### Functional options for gnet
 for example:
 ```go
-    s := tcpserver.NewServer("0.0.0.0:7777",
-        NewServerHandler(),
-        gnet.WithLogger(logger.NewSimpleLogger()),
-        gnet.WithConnNumLimit(50),
-        gnet.WithHeaderCodec(&protocol.CodecProtoVarint{}),
-        ...,
+    service := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPServer),
+        gcore.WithAddr("0.0.0.0:7777"),
+        gcore.WithEventHandler(&ServerHandler{}),
+        gcore.WithLogger(logger.GlobalSimpleLogger()),
+        gcore.WithHeaderCodec(&protocol.CodecProtoVarint{}),
+        gcore.WithReadTimeout(2 * time.Minute),
+        gcore.WithConnNumLimit(1000),
+        gcore.WithHeartbeat([]byte{0}, 30*time.Second),
+        ...
     )
 ```
-See `options.go` for more options
+See `gcore/options.go` for more options
 

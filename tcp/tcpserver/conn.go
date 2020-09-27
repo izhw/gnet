@@ -28,14 +28,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/tcp/internal"
 )
 
-var _ gnet.Conn = &Conn{}
+var _ gcore.Conn = &Conn{}
 
 type Conn struct {
-	s         *server
+	s         *Server
 	conn      *net.TCPConn
 	buffer    *internal.ReaderBuffer
 	sendChan  chan []byte
@@ -46,7 +46,7 @@ type Conn struct {
 	tag       string
 }
 
-func newConn(ctx context.Context, s *server, conn *net.TCPConn) *Conn {
+func newConn(ctx context.Context, s *Server, conn *net.TCPConn) *Conn {
 	c := &Conn{
 		s:         s,
 		conn:      conn,
@@ -61,23 +61,27 @@ func newConn(ctx context.Context, s *server, conn *net.TCPConn) *Conn {
 	return c
 }
 
+func (c *Conn) Init(opts ...gcore.Option) error {
+	return nil
+}
+
 func (c *Conn) Read(buf []byte) (n int, err error) {
-	return 0, gnet.ErrConnInvalidCall
+	return 0, gcore.ErrConnInvalidCall
 }
 
 func (c *Conn) ReadFull(buf []byte) (n int, err error) {
-	return 0, gnet.ErrConnInvalidCall
+	return 0, gcore.ErrConnInvalidCall
 }
 
 func (c *Conn) WriteRead(req []byte) (body []byte, err error) {
-	return nil, gnet.ErrConnInvalidCall
+	return nil, gcore.ErrConnInvalidCall
 }
 
 func (c *Conn) Write(data []byte) error {
 	if len(data) > 0 {
 		select {
 		case <-c.closeChan:
-			return gnet.ErrConnClosed
+			return gcore.ErrConnClosed
 		case c.sendChan <- data:
 		}
 	}
@@ -93,13 +97,13 @@ func (c *Conn) Close() (err error) {
 	for len(c.sendChan) > 0 {
 		data := <-c.sendChan
 		if err := c.write(data); err != nil {
-			c.s.handler.OnWriteError(c, data, err)
+			c.s.opts.Handler.OnWriteError(c, data, err)
 		}
 	}
 	err = c.conn.Close()
 	c.rwg.Wait()
 	c.buffer.Release()
-	c.s.handler.OnClosed(c)
+	c.s.opts.Handler.OnClosed(c)
 	c.s.onConnClose()
 	c.s = nil
 	return
@@ -144,7 +148,7 @@ func (c *Conn) handleReadLoop(ctx context.Context) {
 		c.Close()
 	}()
 
-	h := c.s.handler
+	h := c.s.opts.Handler
 	h.OnOpened(c)
 
 	for {
@@ -210,7 +214,7 @@ func (c *Conn) handleWriteLoop(ctx context.Context) {
 				return
 			}
 			if err := c.write(data); err != nil {
-				c.s.handler.OnWriteError(c, data, err)
+				c.s.opts.Handler.OnWriteError(c, data, err)
 				return
 			}
 		}

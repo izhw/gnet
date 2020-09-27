@@ -25,45 +25,55 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/internal/util/limter"
 	"github.com/izhw/gnet/tcp/tcpclient"
 )
 
+var _ gcore.Pool = &Pool{}
+
 type poolConn struct {
-	conn gnet.Conn
+	conn gcore.Conn
 	t    int64
 }
 
-type pool struct {
-	addr      string
-	opts      gnet.Options
-	factory   gnet.Factory
+type Pool struct {
+	opts      gcore.Options
+	factory   func() (gcore.Conn, error)
 	connChan  chan *poolConn
 	closeChan chan struct{}
 	limiter   limter.Limiter
 	closed    int32
 }
 
-func NewPool(addr string, opts ...gnet.Option) (gnet.Pool, error) {
-	if addr == "" {
-		return nil, gnet.ErrPoolInvalidAddr
+func NewPool() *Pool {
+	return &Pool{}
+}
+
+func (p *Pool) WithOptions(opts gcore.Options) {
+	p.opts = opts
+}
+
+func (p *Pool) Init(opts ...gcore.Option) error {
+	for _, opt := range opts {
+		opt(&p.opts)
 	}
-	p := &pool{
-		addr:      addr,
-		opts:      gnet.DefaultOptions(),
-		closeChan: make(chan struct{}),
-	}
-	for _, o := range opts {
-		o(&p.opts)
+	if p.opts.Addr == "" {
+		return gcore.ErrPoolInvalidAddr
 	}
 	if p.opts.PoolMaxSize == 0 {
-		p.opts.PoolMaxSize = gnet.DefaultPoolSize
+		p.opts.PoolMaxSize = 16
 	}
-	p.factory = func() (gnet.Conn, error) {
-		return tcpclient.NewClient(p.addr, opts...)
+	p.factory = func() (gcore.Conn, error) {
+		c := tcpclient.NewClient()
+		c.WithOptions(p.opts)
+		if err := c.Init(); err != nil {
+			return nil, err
+		}
+		return c, nil
 	}
 	p.connChan = make(chan *poolConn, p.opts.PoolMaxSize)
+	p.closeChan = make(chan struct{})
 	p.limiter = limter.NewTimeoutLimiter(p.opts.PoolMaxSize, p.opts.PoolGetTimeout)
 	go func() {
 		select {
@@ -76,17 +86,17 @@ func NewPool(addr string, opts ...gnet.Option) (gnet.Pool, error) {
 		conn, err := p.createConn()
 		if err != nil {
 			p.Close()
-			return nil, fmt.Errorf("pool:%w", err)
+			return fmt.Errorf("pool:%w", err)
 		}
 		p.connChan <- &poolConn{
 			conn: conn,
 			t:    time.Now().UnixNano(),
 		}
 	}
-	return p, nil
+	return nil
 }
 
-func (p *pool) createConn() (gnet.Conn, error) {
+func (p *Pool) createConn() (gcore.Conn, error) {
 	conn, err := p.factory()
 	if err != nil {
 		return nil, err
@@ -95,9 +105,9 @@ func (p *pool) createConn() (gnet.Conn, error) {
 	return conn, nil
 }
 
-func (p *pool) Get() (conn gnet.Conn, err error) {
+func (p *Pool) Get() (conn gcore.Conn, err error) {
 	if !p.limiter.Allow() {
-		return nil, gnet.ErrPoolTimeout
+		return nil, gcore.ErrPoolTimeout
 	}
 	defer func() {
 		if err != nil {
@@ -108,14 +118,14 @@ func (p *pool) Get() (conn gnet.Conn, err error) {
 	for {
 		select {
 		case <-p.closeChan:
-			return nil, gnet.ErrPoolClosed
+			return nil, gcore.ErrPoolClosed
 		default:
 		}
 
 		select {
 		case pc, ok := <-p.connChan:
 			if !ok {
-				return nil, gnet.ErrPoolClosed
+				return nil, gcore.ErrPoolClosed
 			}
 			if pc.conn.Closed() {
 				continue
@@ -141,7 +151,7 @@ func (p *pool) Get() (conn gnet.Conn, err error) {
 	}
 }
 
-func (p *pool) Put(conn gnet.Conn) {
+func (p *Pool) Put(conn gcore.Conn) {
 	if conn == nil {
 		return
 	}
@@ -161,7 +171,7 @@ func (p *pool) Put(conn gnet.Conn) {
 	}
 }
 
-func (p *pool) Close() {
+func (p *Pool) Close() {
 	if !atomic.CompareAndSwapInt32(&p.closed, 0, 1) {
 		return
 	}

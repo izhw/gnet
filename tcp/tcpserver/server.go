@@ -31,19 +31,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/internal/util/limter"
-	"github.com/izhw/gnet/logger"
 )
 
 const DefaultAddr = "0.0.0.0:7777"
 
-var _ gnet.Server = &server{}
+var _ gcore.Server = &Server{}
 
-type server struct {
-	addr     string
-	opts     gnet.Options
-	handler  gnet.EventHandler
+type Server struct {
+	opts     gcore.Options
 	listener net.Listener
 	limiter  limter.Limiter
 	stopChan chan struct{}
@@ -52,46 +49,47 @@ type server struct {
 	stopped  int32
 }
 
-func NewServer(addr string, h gnet.EventHandler, opts ...gnet.Option) gnet.Server {
-	if addr == "" {
-		addr = DefaultAddr
-	}
-	s := &server{
-		addr:    addr,
-		opts:    gnet.DefaultOptions(),
-		handler: h,
+func NewServer() *Server {
+	return &Server{
 		stopped: 1,
 	}
-	for _, o := range opts {
-		o(&s.opts)
-	}
-	return s
 }
 
-func (s *server) Serve() error {
-	l, err := net.Listen("tcp", s.addr)
+func (s *Server) WithOptions(opts gcore.Options) {
+	s.opts = opts
+}
+
+func (s *Server) Init(opts ...gcore.Option) error {
+	for _, opt := range opts {
+		opt(&s.opts)
+	}
+	if s.opts.Addr == "" {
+		s.opts.Addr = DefaultAddr
+	}
+	l, err := net.Listen("tcp", s.opts.Addr)
 	if err != nil {
 		return err
 	}
 	s.listener = l
-	if s.handler == nil {
-		s.handler = gnet.DefaultEventHandler()
-	}
-	if s.opts.Logger == nil {
-		s.opts.Logger = logger.DefaultLogger()
-	}
 	if s.opts.ConnLimit > 0 {
 		s.limiter = limter.NewLimiter(s.opts.ConnLimit)
 	}
-	s.wg.Add(1)
-	go s.work()
 	s.stopChan = make(chan struct{})
 	s.stopped = 0
+
+	return nil
+}
+
+func (s *Server) Serve() error {
+	if atomic.LoadInt32(&s.stopped) == 1 {
+		return errors.New("server uninitialized")
+	}
+	s.wg.Add(1)
+	go s.work()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGTERM, syscall.SIGINT)
 
-	// Wait on signal
 	select {
 	case <-s.opts.Ctx.Done():
 		s.Stop()
@@ -105,13 +103,13 @@ func (s *server) Serve() error {
 	return nil
 }
 
-func (s *server) wait() {
+func (s *Server) wait() {
 	s.wg.Wait()
 	for atomic.LoadUint32(&s.connNum) > 0 {
 	}
 }
 
-func (s *server) Stop() {
+func (s *Server) Stop() {
 	if !atomic.CompareAndSwapInt32(&s.stopped, 0, 1) {
 		return
 	}
@@ -120,18 +118,18 @@ func (s *server) Stop() {
 	s.wait()
 }
 
-func (s *server) ConnNum() uint32 {
+func (s *Server) ConnNum() uint32 {
 	return atomic.LoadUint32(&s.connNum)
 }
 
-func (s *server) onConnClose() {
+func (s *Server) onConnClose() {
 	if s.limiter != nil {
 		s.limiter.Revert()
 	}
 	atomic.AddUint32(&s.connNum, ^uint32(0))
 }
 
-func (s *server) work() {
+func (s *Server) work() {
 	ctx, cancel := context.WithCancel(s.opts.Ctx)
 	defer func() {
 		cancel()

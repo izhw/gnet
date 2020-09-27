@@ -18,25 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
 import (
-	"github.com/izhw/gnet/gcore"
+	"errors"
 )
 
-type Server gcore.Server
-type Conn gcore.Conn
-type Pool gcore.Pool
-
-// Service is an interface that wraps the server, client and pool,
-// for building and initialising services conveniently.
-type Service interface {
-	Server() Server
-	Client() Conn
-	Pool() Pool
-}
-
-// NewService creates and returns a new Service with options.
-func NewService(opts ...gcore.Option) Service {
-	return newService(opts...)
-}
+var (
+	ErrTooLarge        = errors.New("data:too large")
+	ErrConnClosed      = errors.New("conn:closed")
+	ErrConnInvalidCall = errors.New("conn:invalid call")
+	ErrPoolClosed      = errors.New("pool:closed")
+	ErrPoolTimeout     = errors.New("pool:timeout")
+	ErrPoolInvalidAddr = errors.New("pool:invalid addr")
+)

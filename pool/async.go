@@ -25,43 +25,43 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/izhw/gnet"
+	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/internal/util/limter"
 	"github.com/izhw/gnet/tcp/tcpclient"
 )
 
-type asyncPool struct {
-	addr      string
-	opts      gnet.Options
-	handler   gnet.EventHandler
-	factory   gnet.Factory
-	connChan  chan gnet.Conn
+var _ gcore.Pool = &AsyncPool{}
+
+type AsyncPool struct {
+	opts      gcore.Options
+	factory   func() (gcore.Conn, error)
+	connChan  chan gcore.Conn
 	closeChan chan struct{}
 	limiter   limter.Limiter
 	cancel    context.CancelFunc
 	closed    int32
 }
 
-func NewAsyncPool(addr string, h gnet.EventHandler, opts ...gnet.Option) (gnet.Pool, error) {
-	if addr == "" {
-		return nil, gnet.ErrPoolInvalidAddr
+func NewAsyncPool() *AsyncPool {
+	return &AsyncPool{}
+}
+
+func (p *AsyncPool) WithOptions(opts gcore.Options) {
+	p.opts = opts
+}
+
+func (p *AsyncPool) Init(opts ...gcore.Option) error {
+	for _, opt := range opts {
+		opt(&p.opts)
 	}
-	if h == nil {
-		h = gnet.DefaultEventHandler()
-	}
-	p := &asyncPool{
-		addr:      addr,
-		opts:      gnet.DefaultOptions(),
-		handler:   h,
-		closeChan: make(chan struct{}),
-	}
-	for _, o := range opts {
-		o(&p.opts)
+	if p.opts.Addr == "" {
+		return gcore.ErrPoolInvalidAddr
 	}
 	if p.opts.PoolMaxSize == 0 {
-		p.opts.PoolMaxSize = gnet.DefaultPoolSize
+		p.opts.PoolMaxSize = 16
 	}
-	p.connChan = make(chan gnet.Conn, p.opts.PoolMaxSize)
+	p.connChan = make(chan gcore.Conn, p.opts.PoolMaxSize)
+	p.closeChan = make(chan struct{})
 	p.limiter = limter.NewTimeoutLimiter(p.opts.PoolMaxSize, p.opts.PoolGetTimeout)
 	ctx, cancel := context.WithCancel(p.opts.Ctx)
 	go func() {
@@ -69,22 +69,28 @@ func NewAsyncPool(addr string, h gnet.EventHandler, opts ...gnet.Option) (gnet.P
 		p.Close()
 	}()
 	p.cancel = cancel
-	opts = append(opts, gnet.WithContext(ctx))
-	p.factory = func() (gnet.Conn, error) {
-		return tcpclient.NewAsyncClient(p.addr, p.handler, opts...)
+	p.opts.Ctx = ctx
+
+	p.factory = func() (gcore.Conn, error) {
+		c := tcpclient.NewAsyncClient()
+		c.WithOptions(p.opts)
+		if err := c.Init(); err != nil {
+			return nil, err
+		}
+		return c, nil
 	}
 	for i := 0; i < int(p.opts.PoolInitSize); i++ {
 		conn, err := p.createConn()
 		if err != nil {
 			p.Close()
-			return nil, fmt.Errorf("pool:%w", err)
+			return fmt.Errorf("pool:%w", err)
 		}
 		p.connChan <- conn
 	}
-	return p, nil
+	return nil
 }
 
-func (p *asyncPool) createConn() (gnet.Conn, error) {
+func (p *AsyncPool) createConn() (gcore.Conn, error) {
 	conn, err := p.factory()
 	if err != nil {
 		return nil, err
@@ -93,9 +99,9 @@ func (p *asyncPool) createConn() (gnet.Conn, error) {
 	return conn, nil
 }
 
-func (p *asyncPool) Get() (conn gnet.Conn, err error) {
+func (p *AsyncPool) Get() (conn gcore.Conn, err error) {
 	if !p.limiter.Allow() {
-		return nil, gnet.ErrPoolTimeout
+		return nil, gcore.ErrPoolTimeout
 	}
 	defer func() {
 		if err != nil {
@@ -106,14 +112,14 @@ func (p *asyncPool) Get() (conn gnet.Conn, err error) {
 	for {
 		select {
 		case <-p.closeChan:
-			return nil, gnet.ErrPoolClosed
+			return nil, gcore.ErrPoolClosed
 		default:
 		}
 
 		select {
 		case conn, ok := <-p.connChan:
 			if !ok {
-				return nil, gnet.ErrPoolClosed
+				return nil, gcore.ErrPoolClosed
 			}
 			if conn.Closed() {
 				continue
@@ -125,7 +131,7 @@ func (p *asyncPool) Get() (conn gnet.Conn, err error) {
 	}
 }
 
-func (p *asyncPool) Put(conn gnet.Conn) {
+func (p *AsyncPool) Put(conn gcore.Conn) {
 	if conn == nil {
 		return
 	}
@@ -143,7 +149,7 @@ func (p *asyncPool) Put(conn gnet.Conn) {
 }
 
 // Close
-func (p *asyncPool) Close() {
+func (p *AsyncPool) Close() {
 	if !atomic.CompareAndSwapInt32(&p.closed, 0, 1) {
 		return
 	}

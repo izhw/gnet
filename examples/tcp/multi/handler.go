@@ -5,6 +5,7 @@ import (
 	"github.com/izhw/gnet/logger"
 )
 
+// server handler
 type ServerHandler struct {
 	logger logger.Logger
 }
@@ -34,4 +35,25 @@ func (h *ServerHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func (h *ServerHandler) OnWriteError(c gcore.Conn, data []byte, err error) {
 	h.logger.Warn(c.RemoteAddr(), "data:", string(data), "write error:", err)
+}
+
+// client handler
+type AsyncHandler struct {
+	*gcore.NetEventHandler
+	logger logger.Logger
+}
+
+func NewAsyncHandler() *AsyncHandler {
+	return &AsyncHandler{
+		logger: logger.GlobalSimpleLogger(),
+	}
+}
+
+func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
+	h.logger.Info(c.GetTag(), "AsyncClient read msg:", string(data))
+	return nil
+}
+
+func (h *AsyncHandler) OnWriteError(c gcore.Conn, data []byte, err error) {
+	h.logger.Warn(c.GetTag(), "AsyncClient write error:", err)
 }

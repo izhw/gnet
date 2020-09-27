@@ -18,7 +18,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
 import (
 	"context"
@@ -28,9 +28,16 @@ import (
 	"github.com/izhw/gnet/protocol"
 )
 
+const (
+	MaxRWLen uint32 = 1 << 25 // 32M
+)
+
 type Option func(o *Options)
 
 type Options struct {
+	Addr           string               // addr for service
+	ServiceType    ServiceType          // service type, default ServiceTCPServer
+	Handler        EventHandler         // event handler, default &NetEventHandler
 	Logger         logger.Logger        // default: &discardLogger{}
 	HeaderCodec    protocol.HeaderCodec // default: &protocol.CodecFixed32{}
 	ReadTimeout    time.Duration        // default: 2m, zero value means I/O operations will not time out
@@ -65,6 +72,8 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
+		ServiceType:    ServiceTCPServer,
+		Handler:        DefaultEventHandler(),
 		Logger:         logger.DefaultLogger(),
 		HeaderCodec:    &protocol.CodecFixed32{},
 		ReadTimeout:    2 * time.Minute,
@@ -76,15 +85,29 @@ func DefaultOptions() Options {
 		HeartData:      nil,
 		HeartInterval:  30 * time.Second,
 		PoolInitSize:   0,
-		PoolMaxSize:    10,
-		PoolGetTimeout: 10 * time.Second,
+		PoolMaxSize:    16,
+		PoolGetTimeout: 3 * time.Second,
 	}
 }
 
-// WithOptions
-func WithOptions(opts Options) Option {
+// WithAddr
+func WithAddr(addr string) Option {
 	return func(o *Options) {
-		*o = opts
+		o.Addr = addr
+	}
+}
+
+// WithServiceType
+func WithServiceType(t ServiceType) Option {
+	return func(o *Options) {
+		o.ServiceType = t
+	}
+}
+
+// WithEventHandler
+func WithEventHandler(handler EventHandler) Option {
+	return func(o *Options) {
+		o.Handler = handler
 	}
 }
 
@@ -184,7 +207,6 @@ func WithPoolSize(init, max uint32) Option {
 }
 
 // WithPoolGetTimeout Get a Conn from pool, failed when timeout occurs
-// default: 10s
 func WithPoolGetTimeout(timeout time.Duration) Option {
 	return func(o *Options) {
 		o.PoolGetTimeout = timeout

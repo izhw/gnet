@@ -18,17 +18,49 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gnet
+package gcore
 
-import (
-	"errors"
+type ServiceType uint32
+
+const (
+	ServiceTCPServer ServiceType = 1 << iota
+	ServiceTCPClient
+	ServiceTCPAsyncClient
+	ServiceTCPPool
+	ServiceTCPAsyncPool
 )
 
-var (
-	ErrTooLarge        = errors.New("data:too large")
-	ErrConnClosed      = errors.New("conn:closed")
-	ErrConnInvalidCall = errors.New("conn:invalid call")
-	ErrPoolClosed      = errors.New("pool:closed")
-	ErrPoolTimeout     = errors.New("pool:timeout")
-	ErrPoolInvalidAddr = errors.New("pool:invalid addr")
-)
+func (t ServiceType) TCPServerType() bool {
+	if t&ServiceTCPServer != 0 {
+		return true
+	}
+	return false
+}
+
+func (t ServiceType) TCPClientType() bool {
+	if t&ServiceTCPClient != 0 {
+		return true
+	}
+	return false
+}
+
+func (t ServiceType) TCPAsyncClientType() bool {
+	if t&ServiceTCPAsyncClient != 0 {
+		return true
+	}
+	return false
+}
+
+func (t ServiceType) TCPPoolType() bool {
+	if t&ServiceTCPPool != 0 {
+		return true
+	}
+	return false
+}
+
+func (t ServiceType) TCPAsyncPoolType() bool {
+	if t&ServiceTCPAsyncPool != 0 {
+		return true
+	}
+	return false
+}

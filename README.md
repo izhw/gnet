@@ -47,13 +47,13 @@ func (h *ServerHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func main() {
     log := logger.GlobalSimpleLogger()
-    service := gnet.NewService(
+    svc := gnet.NewService(
         gcore.WithServiceType(gcore.ServiceTCPServer),
         gcore.WithAddr("0.0.0.0:7777"),
         gcore.WithEventHandler(&ServerHandler{}),
         gcore.WithLogger(log),
     )
-    s := service.Server()
+    s := svc.Server()
     if err := s.Init(); err != nil {
         log.Fatal("server init error:", err)
     }
@@ -72,15 +72,15 @@ import (
     "os"
     
     "github.com/izhw/gnet"
-	"github.com/izhw/gnet/gcore"
+    "github.com/izhw/gnet/gcore"
 )
 
 func main() {
-    service := gnet.NewService(
+    svc := gnet.NewService(
         gcore.WithServiceType(gcore.ServiceTCPClient),
         gcore.WithAddr("127.0.0.1:7777"),
     )
-    c := service.Client()
+    c := svc.Client()
     if err := c.Init(); err != nil {
         fmt.Println("client init error:", err)
         os.Exit(1)
@@ -122,13 +122,13 @@ func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func main() {
     log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(&AsyncHandler{}),
 		gcore.WithLogger(log),
 	)
-	c := service.Client()
+	c := svc.Client()
 	if err := c.Init(); err != nil {
 		log.Fatal("client init error:", err)
 	}
@@ -159,20 +159,17 @@ import (
 )
 
 func main() {
-    service := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPPool),
-		gcore.WithAddr("127.0.0.1:7777"),
-		gcore.WithPoolSize(5, 10),
-		//gcore.WithPoolGetTimeout(5*time.Second),
-		//gcore.WithPoolIdleTimeout(30*time.Minute),
-		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
-	)
-	p := service.Pool()
-	if err := p.Init(); err != nil {
-		fmt.Println("pool init error:", err)
-		os.Exit(1)
-	}
-	defer p.Close()
+    svc := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPPool),
+        gcore.WithAddr("127.0.0.1:7777"),
+        gcore.WithPoolSize(5, 10),
+    )
+    p := svc.Pool()
+    if err := p.Init(); err != nil {
+        fmt.Println("pool init error:", err)
+        os.Exit(1)
+    }
+    defer p.Close()
     
     c, err := p.Get()
     if err != nil {
@@ -216,45 +213,45 @@ func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func main() {
     log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
-		gcore.WithAddr("127.0.0.1:7777"),
-		gcore.WithEventHandler(&AsyncHandler{}),
-		gcore.WithPoolSize(0, 10),
-		gcore.WithPoolGetTimeout(5*time.Second),
-		gcore.WithPoolIdleTimeout(30*time.Minute),
-		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
-	)
-	p := service.Pool()
-	if err := p.Init(); err != nil {
-		log.Fatal("pool init error:", err)
-	}
-	defer p.Close()
-
-	c, err := p.Get()
-	if err != nil {
-		log.Fatal("Pool Get error:", err)
-	}
-	defer p.Put(c)
-
-	if err = c.Write([]byte("Hello world")); err != nil {
-		log.Fatal("Pool Write error:", err)
-	}
-	time.Sleep(3 * time.Second)
+    svc := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
+        gcore.WithAddr("127.0.0.1:7777"),
+        gcore.WithEventHandler(&AsyncHandler{}),
+        gcore.WithPoolSize(0, 10),
+        gcore.WithPoolGetTimeout(5*time.Second),
+        gcore.WithPoolIdleTimeout(30*time.Minute),
+        //gcore.WithHeartbeat([]byte{0}, 30*time.Second),
+    )
+    p := svc.Pool()
+    if err := p.Init(); err != nil {
+        log.Fatal("pool init error:", err)
+    }
+    defer p.Close()
+    
+    c, err := p.Get()
+    if err != nil {
+        log.Fatal("Pool Get error:", err)
+    }
+    defer p.Put(c)
+    
+    if err = c.Write([]byte("Hello world")); err != nil {
+        log.Fatal("Pool Write error:", err)
+    }
+    time.Sleep(3 * time.Second)
 }
 ```
 
-#### multi
+#### Multi
 
 You can build `server`, `client` and `pool` in one `service` by setting the `ServiceType`:
-`gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPClient)`
+`gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient|gcore.ServiceTCPAsyncPool)`
 
 ```go
 package main
 
 import (
 	"context"
-    "fmt"
+	"fmt"
 	"time"
 
 	"github.com/izhw/gnet"
@@ -287,13 +284,13 @@ func main() {
 	defer cancel()
 
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
 		gcore.WithLogger(log),
 	)
 
 	// client
-	c := service.Client()
+	c := svc.Client()
 	err := c.Init(
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(&AsyncHandler{}),
@@ -306,9 +303,9 @@ func main() {
 	go StartClient(ctx, c)
 
 	// server
-	s := service.Server()
+	s := svc.Server()
 	err = s.Init(
-		gcore.WithAddr("0.0.0.0:8888"),
+		gcore.WithAddr("0.0.0.0:7778"),
 		gcore.WithEventHandler(&ServerHandler{}),
 	)
 	if err != nil {
@@ -340,7 +337,7 @@ func StartClient(ctx context.Context, c gnet.Conn) {
 #### Functional options for gnet
 for example:
 ```go
-    service := gnet.NewService(
+    svc := gnet.NewService(
         gcore.WithServiceType(gcore.ServiceTCPServer),
         gcore.WithAddr("0.0.0.0:7777"),
         gcore.WithEventHandler(&ServerHandler{}),
@@ -348,7 +345,6 @@ for example:
         gcore.WithHeaderCodec(&protocol.CodecProtoVarint{}),
         gcore.WithReadTimeout(2 * time.Minute),
         gcore.WithConnNumLimit(1000),
-        gcore.WithHeartbeat([]byte{0}, 30*time.Second),
         ...
     )
 ```

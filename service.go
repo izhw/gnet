@@ -30,7 +30,7 @@ import (
 type service struct {
 	opts   gcore.Options
 	server Server
-	client Conn
+	client Client
 	pool   Pool
 }
 
@@ -79,11 +79,11 @@ func (s *service) Server() Server {
 }
 
 // Client returns the client
-func (s *service) Client() Conn {
+func (s *service) Client() Client {
 	return s.client
 }
 
-// Server returns the server
+// Server returns the pool
 func (s *service) Pool() Pool {
 	return s.pool
 }

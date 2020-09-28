@@ -58,11 +58,11 @@ func main() {
 func Client(id int) {
 
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 	)
-	c := service.Client()
+	c := svc.Client()
 	if err := c.Init(); err != nil {
 		log.Error("client init error:", err)
 		return
@@ -84,13 +84,13 @@ func Client(id int) {
 
 func AsyncClient(id int) {
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
 		gcore.WithLogger(log),
 	)
-	c := service.Client()
+	c := svc.Client()
 	if err := c.Init(); err != nil {
 		log.Error("async client init error:", err)
 		return

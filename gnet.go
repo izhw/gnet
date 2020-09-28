@@ -25,18 +25,18 @@ import (
 )
 
 type Server gcore.Server
-type Conn gcore.Conn
+type Client gcore.Conn
 type Pool gcore.Pool
 
 // Service is an interface that wraps the server, client and pool,
 // for building and initialising services conveniently.
 type Service interface {
 	Server() Server
-	Client() Conn
+	Client() Client
 	Pool() Pool
 }
 
-// NewService creates and returns a new Service with options.
+// NewService creates a new Service with options.
 func NewService(opts ...gcore.Option) Service {
 	return newService(opts...)
 }

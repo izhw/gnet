@@ -37,7 +37,7 @@ func main() {
 
 func SyncPool(ctx context.Context) {
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPPool),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithPoolSize(2, 5),
@@ -45,7 +45,7 @@ func SyncPool(ctx context.Context) {
 		//gcore.WithPoolIdleTimeout(30*time.Minute),
 		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
-	p := service.Pool()
+	p := svc.Pool()
 	if err := p.Init(); err != nil {
 		log.Error("pool init error:", err)
 		return
@@ -85,7 +85,7 @@ func SyncPool(ctx context.Context) {
 
 func AsyncPool(ctx context.Context) {
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
@@ -94,7 +94,7 @@ func AsyncPool(ctx context.Context) {
 		gcore.WithPoolIdleTimeout(30*time.Minute),
 		gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
-	p := service.Pool()
+	p := svc.Pool()
 	if err := p.Init(); err != nil {
 		log.Error("pool init error:", err)
 		return

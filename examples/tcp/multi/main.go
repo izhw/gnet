@@ -15,13 +15,13 @@ func main() {
 	defer cancel()
 
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
 		gcore.WithLogger(log),
 	)
 
 	// client
-	c := service.Client()
+	c := svc.Client()
 	err := c.Init(
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
@@ -34,7 +34,7 @@ func main() {
 	go StartClient(ctx, c)
 
 	// server
-	s := service.Server()
+	s := svc.Server()
 	err = s.Init(
 		gcore.WithAddr("0.0.0.0:8888"),
 		gcore.WithEventHandler(NewServerHandler()),
@@ -45,7 +45,7 @@ func main() {
 	log.Fatal("Exit:", s.Serve())
 }
 
-func StartClient(ctx context.Context, c gnet.Conn) {
+func StartClient(ctx context.Context, c gnet.Client) {
 	log := logger.GlobalSimpleLogger()
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()

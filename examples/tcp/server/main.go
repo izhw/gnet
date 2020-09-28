@@ -8,14 +8,14 @@ import (
 
 func main() {
 	log := logger.GlobalSimpleLogger()
-	service := gnet.NewService(
+	svc := gnet.NewService(
 		gcore.WithServiceType(gcore.ServiceTCPServer),
 		gcore.WithAddr("0.0.0.0:7777"),
 		gcore.WithEventHandler(NewServerHandler()),
 		gcore.WithLogger(log),
 	)
 
-	s := service.Server()
+	s := svc.Server()
 	if err := s.Init(); err != nil {
 		log.Fatal("server init error:", err)
 	}

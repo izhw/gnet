@@ -23,8 +23,8 @@ package gnet
 import (
 	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/pool"
-	"github.com/izhw/gnet/tcp/tcpclient"
-	"github.com/izhw/gnet/tcp/tcpserver"
+	"github.com/izhw/gnet/tcp/client"
+	"github.com/izhw/gnet/tcp/server"
 )
 
 type service struct {
@@ -47,17 +47,17 @@ func newService(opts ...gcore.Option) Service {
 
 func (s *service) init() {
 	if s.opts.ServiceType.TCPServerType() {
-		svr := tcpserver.NewServer()
+		svr := server.NewServer()
 		svr.WithOptions(s.opts)
 		s.server = svr
 	}
 	if s.opts.ServiceType.TCPClientType() {
-		c := tcpclient.NewClient()
+		c := client.NewClient()
 		c.WithOptions(s.opts)
 		s.client = c
 	}
 	if s.client == nil && s.opts.ServiceType.TCPAsyncClientType() {
-		c := tcpclient.NewAsyncClient()
+		c := client.NewAsyncClient()
 		c.WithOptions(s.opts)
 		s.client = c
 	}

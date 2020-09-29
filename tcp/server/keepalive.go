@@ -20,7 +20,7 @@
 
 // +build !linux
 
-package tcpserver
+package server
 
 import (
 	"net"

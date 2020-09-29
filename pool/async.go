@@ -27,7 +27,7 @@ import (
 
 	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/internal/util/limter"
-	"github.com/izhw/gnet/tcp/tcpclient"
+	"github.com/izhw/gnet/tcp/client"
 )
 
 var _ gcore.Pool = &AsyncPool{}
@@ -72,7 +72,7 @@ func (p *AsyncPool) Init(opts ...gcore.Option) error {
 	p.opts.Ctx = ctx
 
 	p.factory = func() (gcore.Conn, error) {
-		c := tcpclient.NewAsyncClient()
+		c := client.NewAsyncClient()
 		c.WithOptions(p.opts)
 		if err := c.Init(); err != nil {
 			return nil, err

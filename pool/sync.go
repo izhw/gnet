@@ -27,7 +27,7 @@ import (
 
 	"github.com/izhw/gnet/gcore"
 	"github.com/izhw/gnet/internal/util/limter"
-	"github.com/izhw/gnet/tcp/tcpclient"
+	"github.com/izhw/gnet/tcp/client"
 )
 
 var _ gcore.Pool = &Pool{}
@@ -65,7 +65,7 @@ func (p *Pool) Init(opts ...gcore.Option) error {
 		p.opts.PoolMaxSize = 16
 	}
 	p.factory = func() (gcore.Conn, error) {
-		c := tcpclient.NewClient()
+		c := client.NewClient()
 		c.WithOptions(p.opts)
 		if err := c.Init(); err != nil {
 			return nil, err

@@ -88,6 +88,7 @@ func AsyncClient(id int) {
 		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
+		gcore.WithHeartbeat([]byte{0}, 5*time.Second),
 		gcore.WithLogger(log),
 	)
 	c := svc.Client()
@@ -99,12 +100,12 @@ func AsyncClient(id int) {
 	defer c.Close()
 
 	data := []byte("Hello world " + strconv.Itoa(id))
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 3; i++ {
 		if err := c.Write(data); err != nil {
 			log.Error(id, "write err:", err)
 			return
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 	log.Info("AsyncClient Done:", id)
 }

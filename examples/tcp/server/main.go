@@ -12,6 +12,7 @@ func main() {
 		gcore.WithServiceType(gcore.ServiceTCPServer),
 		gcore.WithAddr("0.0.0.0:7777"),
 		gcore.WithEventHandler(NewServerHandler()),
+		gcore.WithHeartbeat([]byte{0}, 0),
 		gcore.WithLogger(log),
 	)
 

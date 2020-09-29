@@ -45,6 +45,7 @@ type Server struct {
 	limiter  limter.Limiter
 	stopChan chan struct{}
 	wg       sync.WaitGroup
+	heartLen uint32
 	connNum  uint32
 	stopped  int32
 }
@@ -75,6 +76,7 @@ func (s *Server) Init(opts ...gcore.Option) error {
 		s.limiter = limter.NewLimiter(s.opts.ConnLimit)
 	}
 	s.stopChan = make(chan struct{})
+	s.heartLen = uint32(len(s.opts.HeartData))
 	s.stopped = 0
 
 	return nil
@@ -127,6 +129,16 @@ func (s *Server) onConnClose() {
 		s.limiter.Revert()
 	}
 	atomic.AddUint32(&s.connNum, ^uint32(0))
+}
+
+// isHeartBeat called when len(data) == len(s.opts.HeartData)
+func (s *Server) isHeartBeat(data []byte) bool {
+	for i := 0; i < len(s.opts.HeartData); i++ {
+		if s.opts.HeartData[i] != data[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Server) work() {

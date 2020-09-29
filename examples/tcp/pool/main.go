@@ -41,9 +41,9 @@ func SyncPool(ctx context.Context) {
 		gcore.WithServiceType(gcore.ServiceTCPPool),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithPoolSize(2, 5),
+		gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 		//gcore.WithPoolGetTimeout(10*time.Second),
 		//gcore.WithPoolIdleTimeout(30*time.Minute),
-		//gcore.WithHeartbeat([]byte{0}, 30*time.Second),
 	)
 	p := svc.Pool()
 	if err := p.Init(); err != nil {

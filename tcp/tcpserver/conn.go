@@ -189,6 +189,12 @@ func (c *Conn) handleReadLoop(ctx context.Context) {
 			}
 			buf := make([]byte, bodyLen)
 			c.buffer.Read(int(headerLen), int(bodyLen), buf)
+			if bodyLen == c.s.heartLen {
+				if c.s.isHeartBeat(buf) {
+					_ = c.Write(buf)
+					continue
+				}
+			}
 			if err := h.OnReadMsg(c, buf); err != nil {
 				c.s.opts.Logger.Infof("TcpConn OnReadMsg error:[%v]", err)
 				return

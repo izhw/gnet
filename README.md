@@ -122,17 +122,17 @@ func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func main() {
     log := logger.GlobalSimpleLogger()
-	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
-		gcore.WithAddr("127.0.0.1:7777"),
-		gcore.WithEventHandler(&AsyncHandler{}),
-		gcore.WithLogger(log),
-	)
-	c := svc.Client()
-	if err := c.Init(); err != nil {
-		log.Fatal("client init error:", err)
-	}
-	defer c.Close()
+    svc := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
+        gcore.WithAddr("127.0.0.1:7777"),
+        gcore.WithEventHandler(&AsyncHandler{}),
+        gcore.WithLogger(log),
+    )
+    c := svc.Client()
+    if err := c.Init(); err != nil {
+        log.Fatal("client init error:", err)
+    }
+    defer c.Close()
     
     data := []byte("Hello world")
     for i := 0; i < 10; i++ {
@@ -280,57 +280,57 @@ func (h *AsyncHandler) OnReadMsg(c gcore.Conn, data []byte) error {
 
 func main() {
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	log := logger.GlobalSimpleLogger()
-	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
-		gcore.WithLogger(log),
-	)
-
-	// client
-	c := svc.Client()
-	err := c.Init(
-		gcore.WithAddr("127.0.0.1:7777"),
-		gcore.WithEventHandler(&AsyncHandler{}),
-	)
-	if err != nil {
-		log.Fatal("client init error:", err)
-	}
-	defer c.Close()
-
-	go StartClient(ctx, c)
-
-	// server
-	s := svc.Server()
-	err = s.Init(
-		gcore.WithAddr("0.0.0.0:7778"),
-		gcore.WithEventHandler(&ServerHandler{}),
-	)
-	if err != nil {
-		log.Fatal("server init error:", err)
-	}
-	log.Fatal("Exit:", s.Serve())
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    
+    log := logger.GlobalSimpleLogger()
+    svc := gnet.NewService(
+        gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
+        gcore.WithLogger(log),
+    )
+    
+    // client
+    c := svc.Client()
+    err := c.Init(
+        gcore.WithAddr("127.0.0.1:7777"),
+        gcore.WithEventHandler(&AsyncHandler{}),
+    )
+    if err != nil {
+        log.Fatal("client init error:", err)
+    }
+    defer c.Close()
+    
+    go StartClient(ctx, c)
+    
+    // server
+    s := svc.Server()
+    err = s.Init(
+        gcore.WithAddr("0.0.0.0:7778"),
+        gcore.WithEventHandler(&ServerHandler{}),
+    )
+    if err != nil {
+        log.Fatal("server init error:", err)
+    }
+    log.Fatal("Exit:", s.Serve())
 }
 
-func StartClient(ctx context.Context, c gnet.Conn) {
-	log := logger.GlobalSimpleLogger()
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	data := []byte("multi client")
-	for i := 0; i < 1000; i++ {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := c.Write(data); err != nil {
-				log.Error("multi client write err:", err)
-				return
-			}
-		}
-	}
+func StartClient(ctx context.Context, c gnet.Client) {
+    log := logger.GlobalSimpleLogger()
+    ticker := time.NewTicker(1 * time.Second)
+    defer ticker.Stop()
+    
+    data := []byte("multi client")
+    for i := 0; i < 1000; i++ {
+        select {
+        case <-ctx.Done():
+            return
+        case <-ticker.C:
+            if err := c.Write(data); err != nil {
+                log.Error("multi client write err:", err)
+                return
+            }
+        }
+    }
 }
 ```
 
@@ -345,6 +345,7 @@ for example:
         gcore.WithHeaderCodec(&protocol.CodecProtoVarint{}),
         gcore.WithReadTimeout(2 * time.Minute),
         gcore.WithConnNumLimit(1000),
+        gcore.WithHeartbeat([]byte{0}, 30 * time.Second)
         ...
     )
 ```

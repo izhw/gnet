@@ -16,7 +16,7 @@ func main() {
 
 	log := logger.GlobalSimpleLogger()
 	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPServer|gcore.ServiceTCPAsyncClient),
+		gcore.WithServiceType(gcore.SvcTypeTCPServer|gcore.SvcTypeTCPAsyncClient),
 		gcore.WithLogger(log),
 	)
 

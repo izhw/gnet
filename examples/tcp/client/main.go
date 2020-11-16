@@ -59,7 +59,7 @@ func Client(id int) {
 
 	log := logger.GlobalSimpleLogger()
 	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPClient),
+		gcore.WithServiceType(gcore.SvcTypeTCPClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 	)
 	c := svc.Client()
@@ -85,7 +85,7 @@ func Client(id int) {
 func AsyncClient(id int) {
 	log := logger.GlobalSimpleLogger()
 	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPAsyncClient),
+		gcore.WithServiceType(gcore.SvcTypeTCPAsyncClient),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
 		gcore.WithHeartbeat([]byte{0}, 5*time.Second),

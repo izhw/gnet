@@ -32,6 +32,7 @@ import (
 	"time"
 
 	"github.com/izhw/gnet/gcore"
+	"github.com/izhw/gnet/internal/util/delay"
 	"github.com/izhw/gnet/internal/util/limter"
 )
 
@@ -149,12 +150,14 @@ func (s *Server) work() {
 		s.Stop()
 	}()
 
+	td := delay.NewTempDelay(5*time.Millisecond, time.Second)
 	for {
 		conn, err := s.listener.Accept()
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
-				s.opts.Logger.Warnf("TCP server accept temp error:[%v]", ne)
-				time.Sleep(time.Second)
+				d := td.GetDelay()
+				s.opts.Logger.Warnf("TCP server accept temporary error:[%v], delay:%v", ne, d)
+				time.Sleep(d)
 				continue
 			}
 			select {
@@ -165,6 +168,7 @@ func (s *Server) work() {
 			s.opts.Logger.Errorf("TCP server accept error:[%v]", err)
 			return
 		}
+		td.Reset()
 		if s.limiter != nil && !s.limiter.Allow() {
 			conn.Close()
 			s.opts.Logger.Warnf("TCP server accepted max num:%d, new conn rejected", s.opts.ConnLimit)

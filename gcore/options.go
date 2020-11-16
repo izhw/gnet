@@ -24,8 +24,8 @@ import (
 	"context"
 	"time"
 
+	"github.com/izhw/gnet/codec"
 	"github.com/izhw/gnet/logger"
-	"github.com/izhw/gnet/protocol"
 )
 
 const (
@@ -35,16 +35,16 @@ const (
 type Option func(o *Options)
 
 type Options struct {
-	Addr           string               // addr for service
-	ServiceType    ServiceType          // service type, default ServiceTCPServer
-	Handler        EventHandler         // event handler, default &NetEventHandler
-	Logger         logger.Logger        // default: &discardLogger{}
-	HeaderCodec    protocol.HeaderCodec // default: &protocol.CodecFixed32{}
-	ReadTimeout    time.Duration        // default: 2m, zero value means I/O operations will not time out
-	WriteTimeout   time.Duration        // default: 5s, zero value means I/O operations will not time out
-	InitReadBufLen uint32               // default: 1024, init length of conn reading buf
-	MaxReadBufLen  uint32               // default: network.MaxRWLen
-	ConnLimit      uint32               // default: 0, unlimited, limit of conn num for Server
+	Addr           string            // addr for service
+	ServiceType    ServiceType       // service type, default SvcTypeTCPServer
+	Handler        EventHandler      // event handler, default &NetEventHandler
+	Logger         logger.Logger     // default: &discardLogger{}
+	HeaderCodec    codec.HeaderCodec // default: &codec.CodecFixed32{}
+	ReadTimeout    time.Duration     // default: 2m, zero value means I/O operations will not time out
+	WriteTimeout   time.Duration     // default: 5s, zero value means I/O operations will not time out
+	InitReadBufLen uint32            // default: 1024, init length of conn reading buf
+	MaxReadBufLen  uint32            // default: MaxRWLen
+	ConnLimit      uint32            // default: 0, unlimited, limit of conn num for Server
 
 	// Context specifies a context for the service.
 	// Can be used to signal shutdown of the service.
@@ -72,10 +72,10 @@ type Options struct {
 
 func DefaultOptions() Options {
 	return Options{
-		ServiceType:    ServiceTCPServer,
+		ServiceType:    SvcTypeTCPServer,
 		Handler:        DefaultEventHandler(),
 		Logger:         logger.DefaultLogger(),
-		HeaderCodec:    &protocol.CodecFixed32{},
+		HeaderCodec:    &codec.CodecFixed32{},
 		ReadTimeout:    2 * time.Minute,
 		WriteTimeout:   5 * time.Second,
 		InitReadBufLen: 1024,
@@ -118,8 +118,8 @@ func WithLogger(l logger.Logger) Option {
 	}
 }
 
-// default: &protocol.CodecFixed32{}
-func WithHeaderCodec(codec protocol.HeaderCodec) Option {
+// default: &codec.CodecFixed32{}
+func WithHeaderCodec(codec codec.HeaderCodec) Option {
 	return func(o *Options) {
 		if codec != nil {
 			o.HeaderCodec = codec

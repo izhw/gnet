@@ -38,7 +38,7 @@ func main() {
 func SyncPool(ctx context.Context) {
 	log := logger.GlobalSimpleLogger()
 	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPPool),
+		gcore.WithServiceType(gcore.SvcTypeTCPPool),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithPoolSize(2, 5),
 		gcore.WithHeartbeat([]byte{0}, 30*time.Second),
@@ -86,7 +86,7 @@ func SyncPool(ctx context.Context) {
 func AsyncPool(ctx context.Context) {
 	log := logger.GlobalSimpleLogger()
 	svc := gnet.NewService(
-		gcore.WithServiceType(gcore.ServiceTCPAsyncPool),
+		gcore.WithServiceType(gcore.SvcTypeTCPAsyncPool),
 		gcore.WithAddr("127.0.0.1:7777"),
 		gcore.WithEventHandler(NewAsyncHandler()),
 		gcore.WithPoolSize(0, 5),

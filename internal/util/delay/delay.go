@@ -18,49 +18,55 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-package gcore
+package delay
 
-type ServiceType uint32
-
-const (
-	SvcTypeTCPServer ServiceType = 1 << iota
-	SvcTypeTCPClient
-	SvcTypeTCPAsyncClient
-	SvcTypeTCPPool
-	SvcTypeTCPAsyncPool
+import (
+	"time"
 )
 
-func (t ServiceType) TCPServerType() bool {
-	if t&SvcTypeTCPServer != 0 {
-		return true
-	}
-	return false
+type Delay interface {
+	GetDelay() time.Duration
+	Reset()
 }
 
-func (t ServiceType) TCPClientType() bool {
-	if t&SvcTypeTCPClient != 0 {
-		return true
-	}
-	return false
+// double delay in [min, max]
+type tempDelay struct {
+	d   time.Duration // d *= 2
+	min time.Duration // default 5ms
+	max time.Duration // default 1s
 }
 
-func (t ServiceType) TCPAsyncClientType() bool {
-	if t&SvcTypeTCPAsyncClient != 0 {
-		return true
+func NewTempDelay(min, max time.Duration) Delay {
+	if min == 0 {
+		min = 5 * time.Millisecond
 	}
-	return false
+	if max == 0 {
+		max = time.Second
+	}
+	if min > max {
+		min = max
+	}
+	return &tempDelay{
+		d:   0,
+		min: min,
+		max: max,
+	}
 }
 
-func (t ServiceType) TCPPoolType() bool {
-	if t&SvcTypeTCPPool != 0 {
-		return true
+func (d *tempDelay) GetDelay() time.Duration {
+	switch d.d {
+	case 0:
+		d.d = d.min
+	case d.max:
+	default:
+		d.d <<= 1
+		if d.d > d.max {
+			d.d = d.max
+		}
 	}
-	return false
+	return d.d
 }
 
-func (t ServiceType) TCPAsyncPoolType() bool {
-	if t&SvcTypeTCPAsyncPool != 0 {
-		return true
-	}
-	return false
+func (d *tempDelay) Reset() {
+	d.d = 0
 }
